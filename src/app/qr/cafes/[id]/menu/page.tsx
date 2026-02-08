@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { useRouter, useParams } from "next/navigation";
+import { supabase } from "@/lib/supabase/client"; // 👈 browser client
 import MenuCard from "@/app/components/MenuCard";
 import type { MenuItem, CartItem } from "@/types/menu";
 
@@ -20,6 +21,7 @@ export default function QRMenuPage() {
   const [sugarLevel, setSugarLevel] = useState("100%");
   const [cart, setCart] = useState<CartItem[]>([]);
 
+  // ✅ Fetch menu from Supabase
   useEffect(() => {
     if (!cafeId) return;
 
@@ -30,17 +32,27 @@ export default function QRMenuPage() {
         setLoading(true);
         setError(null);
 
-        const res = await fetch(`/api/cafes/${cafeId}/menu`);
-        if (!res.ok) {
-          throw new Error("Failed to load menu");
-        }
+        const { data, error } = await supabase
+          .from("menus")
+          .select("*")
+          .eq("cafe_id", cafeId)
+          .order("category", { ascending: true })
+          .order("price", { ascending: true });
 
-        const data: MenuItem[] = await res.json();
-        if (!cancelled) setMenu(data);
+        console.log("DATA:", data);
+        console.log("ERROR:", error);
+
+        if (error) throw error;
+
+        if (!cancelled) {
+          setMenu(data || []);
+        }
       } catch (err) {
         if (!cancelled) {
           setError(
-            err instanceof Error ? err.message : "Error loading menu"
+            err instanceof Error
+              ? err.message
+              : "Error loading menu"
           );
         }
       } finally {
@@ -83,7 +95,7 @@ export default function QRMenuPage() {
   return (
     <div className="max-w-6xl mx-auto px-4 py-8">
       <h1 className="text-3xl font-bold mb-6">
-        Menu – Artisan Brew House
+        Cafe Menu
       </h1>
 
       {loading && <p>Loading menu…</p>}
@@ -111,15 +123,16 @@ export default function QRMenuPage() {
               Customize {selectedItem.name}
             </h2>
 
-            <label htmlFor="sugar-level" className="block mb-2 font-medium">
+            <label className="block mb-2 font-medium">
               Sugar Level
             </label>
 
             <select
-              id="sugar-level"
               className="w-full border rounded-lg p-2 mb-4"
               value={sugarLevel}
-              onChange={(e) => setSugarLevel(e.target.value)}
+              onChange={(e) =>
+                setSugarLevel(e.target.value)
+              }
             >
               <option value="0%">0%</option>
               <option value="25%">25%</option>

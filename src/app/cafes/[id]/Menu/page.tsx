@@ -9,7 +9,6 @@ type PageProps = {
 };
 
 export default async function CafePublicPage({ params }: PageProps) {
-  // Await the params promise
   const { id: cafeId } = await params;
 
   const { data: menu, error } = await supabase
