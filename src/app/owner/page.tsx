@@ -59,21 +59,6 @@ export default function OwnerDashboard() {
             </Link>
           </div>
 
-          {/* QR Code Management */}
-          <div className="group bg-white rounded-2xl p-6 shadow-md hover:shadow-xl hover:-translate-y-2 transition-all duration-300">
-            <div className="text-3xl mb-4">🔗</div>
-            <h3 className="text-xl font-semibold mb-3">QR Code Management</h3>
-            <p className="text-gray-600 mb-6">
-              Generate QR codes and track scan analytics.
-            </p>
-            <Link
-              href="/owner/qrcodes"
-              className="inline-block bg-linear-to-r from-amber-600 to-amber-800 text-white px-5 py-2 rounded-full font-medium hover:opacity-90 transition"
-            >
-              Manage QR Codes
-            </Link>
-          </div>
-
           {/* AI Insights */}
           <div className="group bg-white rounded-2xl p-6 shadow-md hover:shadow-xl hover:-translate-y-2 transition-all duration-300">
             <div className="text-3xl mb-4">🤖</div>

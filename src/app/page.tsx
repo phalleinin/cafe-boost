@@ -15,25 +15,8 @@ export default function HomePage() {
         </p>
 
         {/* Role Cards */}
-        <div className="flex flex-col sm:flex-row gap-4 mb-100">
-          {/* Customer */}
-          <div className="group bg-white rounded-2xl p-8 shadow-md hover:shadow-xl hover:-translate-y-2 transition-all duration-300">
-            <div className="text-4xl mb-4">☕</div>
-            <h3 className="text-xl font-semibold mb-3">
-              Customer
-            </h3>
-            <p className="text-gray-600 mb-6">
-              Scan QR, browse menu, and order easily.
-            </p>
-            <Link
-              href="/cafes/550634ba-ce7d-48f1-9f91-2241b991b176/Menu"
-              className="inline-block bg-linear-to-r from-amber-600 to-amber-800 text-white px-6 py-3 rounded-full font-medium hover:opacity-90 transition"
-            >
-              Start Ordering
-            </Link>
-          </div>
-
           {/* Owner */}
+          <div>
           <div className="group bg-white rounded-2xl p-8 shadow-md hover:shadow-xl hover:-translate-y-2 transition-all duration-300">
             <div className="text-4xl mb-4">🧑‍💼</div>
             <h3 className="text-xl font-semibold mb-3">
