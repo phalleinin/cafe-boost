@@ -1,13 +1,13 @@
 type MenuItemProps = {
   name: string;
   price: number;
-  available: boolean;
+  is_available: boolean;
 };
 
 export default function MenuItemCard({
   name,
   price,
-  available,
+  is_available,
 }: MenuItemProps) {
   return (
     <div className="border rounded-xl p-4 flex justify-between items-center">
@@ -18,12 +18,12 @@ export default function MenuItemCard({
 
       <span
         className={`text-xs px-2 py-1 rounded-full ${
-          available
+          is_available
             ? "bg-green-100 text-green-700"
             : "bg-red-100 text-red-700"
         }`}
       >
-        {available ? "Available" : "Sold out"}
+        {is_available ? "Available" : "Sold out"}
       </span>
     </div>
   );

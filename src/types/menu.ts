@@ -5,8 +5,8 @@ export interface MenuItem {
   name: string;
   description: string;
   price: number;
-  category: string;
   image: string;
+  is_available: boolean;
   popular?: boolean;
 }
 

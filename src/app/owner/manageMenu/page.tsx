@@ -5,6 +5,17 @@ import { supabase } from "@/lib/supabase/client";
 import type { MenuItem } from "@/types/menu";
 import Link from "next/link";
 
+const {
+  data: { user },
+} = await supabase.auth.getUser();
+
+if (!user) throw new Error("Not authenticated");
+
+const { data: profile } = await supabase
+  .from("profiles")
+  .select("cafe_id")
+  .eq("id", user.id)
+  .single();
 
 export default function OwnerMenuPage() {
   const [menu, setMenu] = useState<MenuItem[]>([]);
@@ -23,7 +34,8 @@ export default function OwnerMenuPage() {
         const { data, error } = await supabase
           .from("menus")
           .select("*")
-          .order("category", { ascending: true })
+          .eq ("cafe_id", profile.cafe_id)
+          .order("is_available", {ascending: false})
           .order("price", { ascending: true });
 
         if (error) throw error;
@@ -74,6 +86,12 @@ export default function OwnerMenuPage() {
               <div
                 key={item.id}
                 className="group bg-white rounded-2xl p-6 shadow-md hover:shadow-xl hover:-translate-y-2 transition-all duration-300"
+                {...!item.is_available && (
+                  <span className="inline-block mb-2 text-sm text-red-600 font-semibold">
+                    Unavailable
+                  </span>
+                )}
+
               >
                 <h3 className="text-xl font-semibold mb-2">{item.name}</h3>
                 <p className="text-gray-600 mb-2">{item.description}</p>

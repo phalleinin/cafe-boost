@@ -29,7 +29,7 @@ export default function HomePage() {
               href="/owner"
               className="inline-block bg-linear-to-r from-amber-600 to-amber-800 text-white px-6 py-3 rounded-full font-medium hover:opacity-90 transition"
             >
-              Owner Login
+              Click Here
             </Link>
           </div>
 
@@ -46,7 +46,7 @@ export default function HomePage() {
               href="/barista"
               className="inline-block bg-linear-to-r from-amber-600 to-amber-800 text-white px-6 py-3 rounded-full font-medium hover:opacity-90 transition"
             >
-              Barista Login
+              Click here
             </Link>
           </div>
         </div>
