@@ -57,7 +57,7 @@ export default function AuthCallbackPage() {
         localStorage.removeItem("pendingCafeName");
       }
 
-      router.push("/owner/dashboardOwner");
+      router.push("/owner/dashboard");
     };
 
     run();

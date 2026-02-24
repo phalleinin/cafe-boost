@@ -35,6 +35,7 @@ export default function QRMenuPage() {
           .from("menus")
           .select("*")
           .eq("cafe_id", cafeId)
+          .eq("is_available", true)            // ✅ ADDED: only load available items
           .order("category", { ascending: true })
           .order("price", { ascending: true });
 

@@ -3,11 +3,13 @@
 import { useState } from "react";
 import { supabase } from "@/lib/supabase/client";
 import { AuthApiError } from "@supabase/supabase-js";
+import { useRouter } from "next/navigation";
 
 export default function OwnerSignupPage() {
+  const router = useRouter();
+  const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
-  const [cafeName, setCafeName] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
@@ -18,49 +20,45 @@ export default function OwnerSignupPage() {
       setError(null);
       setSuccess(null);
 
-      // 🔥 Clear any stale session
-      await supabase.auth.signOut();
-
-      // 1️⃣ Store cafe name temporarily for callback onboarding
-      localStorage.setItem("pendingCafeName", cafeName);
-
-      // 2️⃣ Create auth user only
+      // 1️⃣ Create auth user
       const { data, error: authError } = await supabase.auth.signUp({
         email,
         password,
-        options: {
-          emailRedirectTo: `${window.location.origin}/auth/callback`,
-        },
       });
 
       if (authError) throw authError;
 
-      // 3️⃣ Email confirmation required scenario
-      if (!data.user) {
-        setSuccess(
-          "Account created! Please check your email to confirm your cafe account."
-        );
-        return;
-      }
+      const user = data.user;
+      if (!user) throw new Error("Signup failed. Please try again.");
 
-      // ⚠️ If email confirmation is OFF (dev mode)
-      setSuccess(
-        "Account created successfully! Redirecting to dashboard..."
-      );
+      // 2️⃣ Create profiles row
+      const { error: profileError } = await supabase
+        .from("profiles")
+        .insert({
+          id: user.id,
+          name: name,
+          role: "owner",
+          cafe_id: null,
+        });
 
-      // Small delay for UX
+      if (profileError) throw profileError;
+
+      // 3️⃣ Store credentials so setup-cafe can re-authenticate
+      sessionStorage.setItem("setupEmail", email);
+      sessionStorage.setItem("setupPassword", password);
+
+      setSuccess("Account created! Redirecting to café setup...");
+
       setTimeout(() => {
-        window.location.href = "/owner/dashboardOwner";
-      }, 1500);
+        router.push(`/owner/setup-cafe?uid=${user.id}`);
+      }, 1000);
 
     } catch (err) {
-      console.error("SIGNUP ERROR:", err);
+      console.error("SIGNUP ERROR FULL:", JSON.stringify(err, null, 2));
 
       if (err instanceof AuthApiError) {
         if (err.status === 429) {
-          setError(
-            "Too many signup attempts. Please wait a few minutes."
-          );
+          setError("Too many signup attempts. Please wait a few minutes.");
         } else {
           setError(err.message);
         }
@@ -82,10 +80,10 @@ export default function OwnerSignupPage() {
       {success && <p className="text-green-600 mb-4">{success}</p>}
 
       <input
-        placeholder="Cafe Name"
+        placeholder="Your Name"
         className="w-full mb-3 p-3 border rounded"
-        value={cafeName}
-        onChange={(e) => setCafeName(e.target.value)}
+        value={name}
+        onChange={(e) => setName(e.target.value)}
         required
       />
 

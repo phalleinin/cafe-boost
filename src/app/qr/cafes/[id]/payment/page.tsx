@@ -13,6 +13,8 @@ export default function PaymentPage() {
 
   const [cart, setCart] = useState<CartItem[]>([]);
   const [mounted, setMounted] = useState(false);
+  const [customerName, setCustomerName] = useState("");
+  const [paymentMethod, setPaymentMethod] = useState("cash");
 
   useEffect(() => {
     const savedCart = localStorage.getItem("cart");
@@ -22,8 +24,6 @@ export default function PaymentPage() {
     setMounted(true);
   }, []);
 
-  const [paymentMethod, setPaymentMethod] = useState("cash");
-
   const total = cart.reduce(
     (sum, item) => sum + item.price * item.quantity,
     0
@@ -32,12 +32,18 @@ export default function PaymentPage() {
   const handlePayNow = async () => {
     if (!cafeId || cart.length === 0) return;
 
+    if (!customerName.trim()) {
+      alert("Please enter your name before confirming.");
+      return;
+    }
+
     try {
-      // 1️⃣ Insert order
+      // 1️⃣ Insert order — now includes customer_name
       const { data: order, error: orderError } = await supabase
         .from("orders")
         .insert({
           cafe_id: cafeId,
+          customer_name: customerName.trim(),
           total,
           payment_method: paymentMethod,
           status: "pending",
@@ -47,14 +53,16 @@ export default function PaymentPage() {
 
       if (orderError) throw orderError;
 
-      // 2️⃣ Insert items
+      // 2️⃣ Insert order_items — matches finalized schema:
+      // removed: name, price
+      // renamed: sugar_level → notes
+      // added:   unit_price
       const itemsToInsert = cart.map((item) => ({
         order_id: order.id,
         menu_id: item.id,
-        name: item.name,
-        sugar_level: item.sugarLevel,
-        price: item.price,
         quantity: item.quantity,
+        unit_price: item.price,           // price at time of order
+        notes: item.sugarLevel ?? null,   // renamed from sugar_level
       }));
 
       const { error: itemsError } = await supabase
@@ -112,7 +120,7 @@ export default function PaymentPage() {
                   <div>
                     <h2 className="text-lg font-semibold">{item.name}</h2>
                     <p className="text-sm text-gray-600">
-                      Sugar: {item.sugarLevel}
+                      Notes: {item.sugarLevel || "—"}
                     </p>
                   </div>
                   <div className="text-amber-700 font-medium">
@@ -126,6 +134,16 @@ export default function PaymentPage() {
             <div className="font-bold text-xl mb-6">
               Total: ${total.toFixed(2)}
             </div>
+
+            {/* Customer Name */}
+            <label className="block mb-2 font-medium">Your Name</label>
+            <input
+              type="text"
+              placeholder="Enter your name"
+              className="w-full border rounded-lg p-3 mb-6"
+              value={customerName}
+              onChange={(e) => setCustomerName(e.target.value)}
+            />
 
             {/* Payment Method */}
             <label className="block mb-2 font-medium">Payment Method</label>

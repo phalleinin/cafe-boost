@@ -1,1 +1,0 @@
-// Mock café list (Café Shops)

@@ -2,12 +2,12 @@
 
 export interface MenuItem {
   id: string;
+  cafe_id: string;
   name: string;
-  description: string;
+  description: string | null;
   price: number;
-  image: string;
   is_available: boolean;
-  popular?: boolean;
+  created_at: string;
 }
 
 export interface CartItem extends MenuItem {
