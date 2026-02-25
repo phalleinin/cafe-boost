@@ -44,6 +44,21 @@ export default function BaristaDashboard() {
             </Link>
           </div>
 
+          {/* Popular Items */}
+          <div className="group bg-white rounded-2xl p-6 shadow-md hover:shadow-xl hover:-translate-y-2 transition-all duration-300">
+            <div className="text-3xl mb-4">🔥</div>
+            <h3 className="text-xl font-semibold mb-3">Popular Items</h3>
+            <p className="text-gray-600 mb-6">
+              See trending menu items to prepare for demand.
+            </p>
+            <Link
+              href="/barista/popular"
+              className="inline-block bg-linear-to-r from-amber-600 to-amber-800 text-white px-5 py-2 rounded-full font-medium hover:opacity-90 transition"
+            >
+              View Popular Items
+            </Link>
+          </div>
+
           {/* Menu (Read-Only) */}
           <div className="group bg-white rounded-2xl p-6 shadow-md hover:shadow-xl hover:-translate-y-2 transition-all duration-300">
             <div className="text-3xl mb-4">📋</div>
