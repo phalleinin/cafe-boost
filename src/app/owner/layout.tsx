@@ -10,6 +10,7 @@ export default function OwnerLayout({ children }: { children: React.ReactNode })
   const [cafeName, setCafeName] = useState("");
   const [ownerName, setOwnerName] = useState("");
   const [collapsed, setCollapsed] = useState(false);
+  const [mounted, setMounted] = useState(false);
 
   useEffect(() => {
     const init = async () => {
@@ -32,22 +33,22 @@ export default function OwnerLayout({ children }: { children: React.ReactNode })
         .single();
 
       setCafeName(cafe?.name || "");
+      setMounted(true); // ✅ set mounted after data is ready
     };
 
     init();
   }, []);
 
   const navItems = [
-    { href: "/owner/dashboard", icon: "◉", label: "Analytics" },
-    { href: "/owner/orders", icon: "◎", label: "Orders" },
-    { href: "/owner/manageMenu", icon: "◈", label: "Menu" },
+    { href: "/owner/dashboard", icon: "◎", label: "Orders" },
+    { href: "/owner/analytics", icon: "◉", label: "Analytics" },
+    { href: "/owner/menu", icon: "◈", label: "Menu" },
     { href: "/owner/menuQR", icon: "▣", label: "QR Code" },
-    { href: "/owner/barista", icon: "◍", label: "Baristas" },
   ];
 
   const handleSignOut = async () => {
     await supabase.auth.signOut();
-    window.location.href = "/owner/login";
+    window.location.href = "/";
   };
 
   return (
@@ -326,7 +327,7 @@ export default function OwnerLayout({ children }: { children: React.ReactNode })
               <Link
                 key={item.href}
                 href={item.href}
-                className={`nav-item ${pathname === item.href ? "active" : ""}`}
+                className={`nav-item ${mounted && pathname === item.href ? "active" : ""}`}
               >
                 <span className="nav-icon">{item.icon}</span>
                 <span className="nav-label">{item.label}</span>
@@ -352,7 +353,7 @@ export default function OwnerLayout({ children }: { children: React.ReactNode })
         <div className="main-area">
           <header className="top-bar">
             <span className="page-title">
-              {navItems.find((n) => n.href === pathname)?.label || "Dashboard"}
+              {mounted ? (navItems.find((n) => n.href === pathname)?.label || "Dashboard") : ""}
             </span>
             <div className="top-bar-right">
               <span className="cafe-badge">{cafeName}</span>

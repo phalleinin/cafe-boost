@@ -22,7 +22,7 @@ export default function OwnerIndexPage() {
       if (!profile?.cafe_id) {
         window.location.href = "/owner/setup-cafe";
       } else {
-        window.location.href = "/owner/dashboard";
+        window.location.href = "/owner/orders";
       }
     };
 

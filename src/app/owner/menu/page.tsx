@@ -10,19 +10,14 @@ export default function OwnerMenuPage() {
   const [menu, setMenu] = useState<MenuItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-
   const [editingItem, setEditingItem] = useState<MenuItem | null>(null);
   const [deletingId, setDeletingId] = useState<string | null>(null);
 
-  // ✅ Step 1 — Get session + cafe_id
   useEffect(() => {
     const init = async () => {
       try {
         const { data: { user } } = await supabase.auth.getUser();
-        if (!user) {
-          window.location.href = "/owner/login";
-          return;
-        }
+        if (!user) { window.location.href = "/auth/signin"; return; }
 
         const { data: profile, error: profileError } = await supabase
           .from("profiles")
@@ -31,10 +26,7 @@ export default function OwnerMenuPage() {
           .single();
 
         if (profileError) throw profileError;
-        if (!profile?.cafe_id) {
-          window.location.href = "/owner/setup-cafe";
-          return;
-        }
+        if (!profile?.cafe_id) { window.location.href = "/auth/setup-cafe"; return; }
 
         setCafeId(profile.cafe_id);
       } catch (err) {
@@ -42,21 +34,17 @@ export default function OwnerMenuPage() {
         setLoading(false);
       }
     };
-
     init();
   }, []);
 
-  // ✅ Step 2 — Fetch menu once cafeId is available
   useEffect(() => {
     if (!cafeId) return;
-
     let cancelled = false;
 
     const fetchMenu = async () => {
       try {
         setLoading(true);
         setError(null);
-
         const { data, error } = await supabase
           .from("menus")
           .select("*")
@@ -67,9 +55,7 @@ export default function OwnerMenuPage() {
         if (error) throw error;
         if (!cancelled) setMenu(data || []);
       } catch (err) {
-        if (!cancelled) {
-          setError(err instanceof Error ? err.message : "Error loading menu");
-        }
+        if (!cancelled) setError(err instanceof Error ? err.message : "Error loading menu");
       } finally {
         if (!cancelled) setLoading(false);
       }
@@ -79,47 +65,27 @@ export default function OwnerMenuPage() {
     return () => { cancelled = true; };
   }, [cafeId]);
 
-  // ✅ Toggle availability
   const handleToggleAvailability = async (item: MenuItem) => {
     const { error } = await supabase
       .from("menus")
       .update({ is_available: !item.is_available })
       .eq("id", item.id);
 
-    if (error) {
-      alert("Failed to update availability");
-      return;
-    }
-
-    setMenu((prev) =>
-      prev.map((m) =>
-        m.id === item.id ? { ...m, is_available: !m.is_available } : m
-      )
-    );
+    if (error) { alert("Failed to update availability"); return; }
+    setMenu((prev) => prev.map((m) => m.id === item.id ? { ...m, is_available: !m.is_available } : m));
   };
 
-  // ✅ Delete item
   const handleDelete = async (id: string) => {
     if (!confirm("Are you sure you want to delete this item?")) return;
-
     setDeletingId(id);
 
-    const { error } = await supabase
-      .from("menus")
-      .delete()
-      .eq("id", id);
-
-    if (error) {
-      alert("Failed to delete item");
-      setDeletingId(null);
-      return;
-    }
+    const { error } = await supabase.from("menus").delete().eq("id", id);
+    if (error) { alert("Failed to delete item"); setDeletingId(null); return; }
 
     setMenu((prev) => prev.filter((m) => m.id !== id));
     setDeletingId(null);
   };
 
-  // ✅ Save edited item
   const handleSaveEdit = async () => {
     if (!editingItem) return;
 
@@ -133,86 +99,385 @@ export default function OwnerMenuPage() {
       })
       .eq("id", editingItem.id);
 
-    if (error) {
-      alert("Failed to update item");
-      return;
-    }
-
-    setMenu((prev) =>
-      prev.map((m) => (m.id === editingItem.id ? editingItem : m))
-    );
+    if (error) { alert("Failed to update item"); return; }
+    setMenu((prev) => prev.map((m) => m.id === editingItem.id ? editingItem : m));
     setEditingItem(null);
   };
 
   return (
-    <main className="min-h-screen bg-linear-to-b from-white to-gray-50">
-      <section className="max-w-6xl mx-auto px-6 py-12">
+    <>
+      <style>{`
+        @import url('https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@300;600&family=DM+Sans:wght@300;400;500&display=swap');
 
+        .menu-root {
+          font-family: 'DM Sans', sans-serif;
+          color: #1A0F00;
+        }
+
+        .menu-header {
+          display: flex;
+          align-items: flex-end;
+          justify-content: space-between;
+          margin-bottom: 28px;
+          flex-wrap: wrap;
+          gap: 16px;
+        }
+
+        .menu-title {
+          font-family: 'Cormorant Garamond', serif;
+          font-size: 28px;
+          font-weight: 600;
+          color: #1A0F00;
+          margin-bottom: 4px;
+        }
+
+        .menu-sub {
+          font-size: 13px;
+          color: rgba(26,15,0,0.4);
+          font-weight: 300;
+        }
+
+        .add-btn {
+          display: inline-flex;
+          align-items: center;
+          gap: 6px;
+          background: #C8873A;
+          color: #ffffff;
+          padding: 10px 22px;
+          border-radius: 100px;
+          font-size: 13px;
+          font-weight: 500;
+          letter-spacing: 0.04em;
+          text-decoration: none;
+          transition: opacity 0.2s, transform 0.2s;
+          box-shadow: 0 4px 12px rgba(200,135,58,0.25);
+        }
+
+        .add-btn:hover {
+          opacity: 0.88;
+          transform: translateY(-1px);
+        }
+
+        .status-msg {
+          font-size: 13px;
+          color: rgba(26,15,0,0.35);
+          padding: 32px 0;
+          text-align: center;
+        }
+
+        .error-msg {
+          font-size: 13px;
+          color: #C03030;
+          background: rgba(220,50,50,0.06);
+          border: 1px solid rgba(220,50,50,0.15);
+          padding: 10px 16px;
+          border-radius: 10px;
+          margin-bottom: 16px;
+        }
+
+        .menu-grid {
+          display: grid;
+          grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+          gap: 16px;
+          margin-bottom: 32px;
+        }
+
+        .menu-card {
+          background: #ffffff;
+          border: 1px solid rgba(200,135,58,0.12);
+          border-radius: 18px;
+          padding: 24px;
+          transition: border-color 0.2s, box-shadow 0.2s, transform 0.2s;
+          box-shadow: 0 2px 8px rgba(0,0,0,0.03);
+        }
+
+        .menu-card:hover {
+          border-color: rgba(200,135,58,0.25);
+          box-shadow: 0 8px 24px rgba(200,135,58,0.08);
+          transform: translateY(-2px);
+        }
+
+        .unavailable-badge {
+          display: inline-block;
+          font-size: 10px;
+          font-weight: 500;
+          letter-spacing: 0.1em;
+          text-transform: uppercase;
+          color: #C03030;
+          background: rgba(220,50,50,0.08);
+          border: 1px solid rgba(220,50,50,0.15);
+          padding: 2px 10px;
+          border-radius: 100px;
+          margin-bottom: 12px;
+        }
+
+        .item-name {
+          font-family: 'Cormorant Garamond', serif;
+          font-size: 20px;
+          font-weight: 600;
+          color: #1A0F00;
+          margin-bottom: 4px;
+        }
+
+        .item-desc {
+          font-size: 12px;
+          color: rgba(26,15,0,0.4);
+          font-weight: 300;
+          line-height: 1.5;
+          margin-bottom: 12px;
+          min-height: 18px;
+        }
+
+        .item-price {
+          font-family: 'Cormorant Garamond', serif;
+          font-size: 22px;
+          font-weight: 600;
+          color: #C8873A;
+          margin-bottom: 16px;
+        }
+
+        .card-actions {
+          display: flex;
+          gap: 6px;
+          flex-wrap: wrap;
+          padding-top: 12px;
+          border-top: 1px solid rgba(200,135,58,0.08);
+        }
+
+        .btn {
+          padding: 7px 14px;
+          border-radius: 100px;
+          font-size: 11px;
+          font-weight: 500;
+          font-family: 'DM Sans', sans-serif;
+          cursor: pointer;
+          transition: all 0.2s;
+          border: 1px solid;
+          letter-spacing: 0.04em;
+        }
+
+        .btn-edit {
+          background: rgba(200,135,58,0.08);
+          color: #C8873A;
+          border-color: rgba(200,135,58,0.25);
+        }
+
+        .btn-edit:hover {
+          background: rgba(200,135,58,0.16);
+        }
+
+        .btn-delete {
+          background: rgba(220,50,50,0.06);
+          color: #C03030;
+          border-color: rgba(220,50,50,0.2);
+        }
+
+        .btn-delete:hover {
+          background: rgba(220,50,50,0.12);
+        }
+
+        .btn-delete:disabled {
+          opacity: 0.4;
+          cursor: not-allowed;
+        }
+
+        .btn-toggle {
+          background: rgba(26,15,0,0.04);
+          color: rgba(26,15,0,0.5);
+          border-color: rgba(26,15,0,0.1);
+        }
+
+        .btn-toggle:hover {
+          background: rgba(26,15,0,0.08);
+          color: rgba(26,15,0,0.7);
+        }
+
+        .qr-section {
+          display: flex;
+          justify-content: center;
+          padding-top: 16px;
+          border-top: 1px solid rgba(200,135,58,0.1);
+        }
+
+        .qr-btn {
+          display: inline-flex;
+          align-items: center;
+          gap: 8px;
+          padding: 12px 28px;
+          border-radius: 100px;
+          font-size: 13px;
+          font-weight: 500;
+          letter-spacing: 0.04em;
+          text-decoration: none;
+          transition: all 0.2s;
+        }
+
+        .qr-btn.active {
+          background: #C8873A;
+          color: #ffffff;
+          box-shadow: 0 4px 12px rgba(200,135,58,0.25);
+        }
+
+        .qr-btn.active:hover {
+          opacity: 0.88;
+          transform: translateY(-1px);
+        }
+
+        .qr-btn.disabled {
+          background: rgba(26,15,0,0.06);
+          color: rgba(26,15,0,0.25);
+          pointer-events: none;
+          cursor: not-allowed;
+        }
+
+        /* MODAL */
+        .modal-overlay {
+          position: fixed;
+          inset: 0;
+          background: rgba(26,15,0,0.4);
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          z-index: 50;
+          padding: 24px;
+          backdrop-filter: blur(4px);
+        }
+
+        .modal-card {
+          background: #ffffff;
+          border-radius: 20px;
+          padding: 32px;
+          width: 100%;
+          max-width: 420px;
+          box-shadow: 0 24px 64px rgba(0,0,0,0.12);
+          border: 1px solid rgba(200,135,58,0.15);
+        }
+
+        .modal-title {
+          font-family: 'Cormorant Garamond', serif;
+          font-size: 22px;
+          font-weight: 600;
+          color: #1A0F00;
+          margin-bottom: 20px;
+        }
+
+        .modal-label {
+          display: block;
+          font-size: 11px;
+          font-weight: 500;
+          letter-spacing: 0.1em;
+          text-transform: uppercase;
+          color: rgba(26,15,0,0.45);
+          margin-bottom: 6px;
+        }
+
+        .modal-input {
+          width: 100%;
+          padding: 10px 14px;
+          border: 1px solid rgba(200,135,58,0.2);
+          border-radius: 10px;
+          background: #F7F3EE;
+          color: #1A0F00;
+          font-size: 13px;
+          font-family: 'DM Sans', sans-serif;
+          outline: none;
+          transition: border-color 0.2s, box-shadow 0.2s;
+          margin-bottom: 16px;
+        }
+
+        .modal-input:focus {
+          border-color: rgba(200,135,58,0.45);
+          box-shadow: 0 0 0 3px rgba(200,135,58,0.08);
+          background: #ffffff;
+        }
+
+        .modal-input::placeholder {
+          color: rgba(26,15,0,0.22);
+        }
+
+        .modal-actions {
+          display: flex;
+          justify-content: flex-end;
+          gap: 8px;
+          margin-top: 8px;
+        }
+
+        .modal-cancel {
+          padding: 10px 20px;
+          border-radius: 100px;
+          border: 1px solid rgba(26,15,0,0.12);
+          background: transparent;
+          color: rgba(26,15,0,0.5);
+          font-size: 12px;
+          font-family: 'DM Sans', sans-serif;
+          cursor: pointer;
+          transition: all 0.2s;
+        }
+
+        .modal-cancel:hover {
+          background: rgba(26,15,0,0.04);
+          color: #1A0F00;
+        }
+
+        .modal-save {
+          padding: 10px 24px;
+          border-radius: 100px;
+          border: none;
+          background: #C8873A;
+          color: #ffffff;
+          font-size: 12px;
+          font-weight: 500;
+          font-family: 'DM Sans', sans-serif;
+          cursor: pointer;
+          transition: opacity 0.2s;
+          letter-spacing: 0.04em;
+        }
+
+        .modal-save:hover { opacity: 0.88; }
+      `}</style>
+
+      <div className="menu-root">
         {/* Header */}
-        <div className="flex items-center justify-between mb-8">
+        <div className="menu-header">
           <div>
-            <h1 className="text-4xl font-bold tracking-tight animate-fade-in">
-              Manage Café Menu
-            </h1>
-            <p className="text-lg text-gray-600 animate-fade-in delay-100">
-              Add, edit, or remove items from your café menu.
-            </p>
+            <h1 className="menu-title">Manage Menu</h1>
+            <p className="menu-sub">Add, edit, or remove items from your café menu.</p>
           </div>
-          <Link
-            href="/owner/menu/add"
-            className="bg-linear-to-r from-amber-600 to-amber-800 text-white px-6 py-3 rounded-full shadow-lg hover:opacity-90 transition"
-          >
+          <Link href="/owner/menu/add" className="add-btn">
             + Add New Item
           </Link>
         </div>
 
-        {/* Loading / Error */}
-        {loading && <p className="text-gray-500">Loading menu…</p>}
-        {error && <p className="text-red-500">{error}</p>}
+        {loading && <p className="status-msg">Loading menu…</p>}
+        {error && <div className="error-msg">{error}</div>}
 
-        {/* Empty state */}
         {!loading && !error && menu.length === 0 && (
-          <p className="text-gray-500">No menu items yet. Add your first item!</p>
+          <p className="status-msg">No menu items yet. Add your first item!</p>
         )}
 
-        {/* Menu Grid */}
         {!loading && !error && menu.length > 0 && (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mb-12">
+          <div className="menu-grid">
             {menu.map((item) => (
-              <div
-                key={item.id}
-                className="bg-white rounded-2xl p-6 shadow-md hover:shadow-xl hover:-translate-y-2 transition-all duration-300"
-              >
+              <div key={item.id} className="menu-card">
                 {!item.is_available && (
-                  <span className="inline-block mb-2 text-sm text-red-600 font-semibold">
-                    Unavailable
-                  </span>
+                  <span className="unavailable-badge">Unavailable</span>
                 )}
+                <h3 className="item-name">{item.name}</h3>
+                <p className="item-desc">{item.description}</p>
+                <p className="item-price">${item.price.toFixed(2)}</p>
 
-                <h3 className="text-xl font-semibold mb-1">{item.name}</h3>
-                <p className="text-gray-600 mb-2 text-sm">{item.description}</p>
-                <p className="text-lg font-bold text-amber-700 mb-4">
-                  ${item.price.toFixed(2)}
-                </p>
-
-                <div className="flex gap-2 mt-4 flex-wrap">
-                  <button
-                    onClick={() => setEditingItem(item)}
-                    className="bg-linear-to-r from-amber-600 to-amber-800 text-white px-4 py-2 rounded-full hover:opacity-90 transition text-sm"
-                  >
+                <div className="card-actions">
+                  <button onClick={() => setEditingItem(item)} className="btn btn-edit">
                     Edit
                   </button>
                   <button
                     onClick={() => handleDelete(item.id)}
                     disabled={deletingId === item.id}
-                    className="bg-red-600 text-white px-4 py-2 rounded-full hover:opacity-90 transition text-sm disabled:opacity-50"
+                    className="btn btn-delete"
                   >
                     {deletingId === item.id ? "Deleting..." : "Delete"}
                   </button>
-                  <button
-                    onClick={() => handleToggleAvailability(item)}
-                    className="border border-gray-300 text-gray-700 px-4 py-2 rounded-full hover:bg-gray-100 transition text-sm"
-                  >
+                  <button onClick={() => handleToggleAvailability(item)} className="btn btn-toggle">
                     {item.is_available ? "Mark Unavailable" : "Mark Available"}
                   </button>
                 </div>
@@ -221,59 +486,48 @@ export default function OwnerMenuPage() {
           </div>
         )}
 
-        {/* Generate QR Button */}
-        <div className="flex justify-center mt-8">
+        {/* QR Button */}
+        <div className="qr-section">
           <Link
             href="/owner/menuQR"
-            className={`px-8 py-4 rounded-full shadow-lg transition ${
-              menu.length > 0
-                ? "bg-linear-to-r from-amber-600 to-amber-800 text-white hover:opacity-90"
-                : "bg-gray-300 text-gray-600 cursor-not-allowed pointer-events-none"
-            }`}
+            className={`qr-btn ${menu.length > 0 ? "active" : "disabled"}`}
           >
-            Generate QR for the Menu
+            ▣ Generate QR for Menu
           </Link>
         </div>
-
-      </section>
+      </div>
 
       {/* Edit Modal */}
       {editingItem && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
-          <div className="bg-white rounded-2xl p-6 w-full max-w-md shadow-lg">
-            <h2 className="text-xl font-semibold mb-4">Edit Menu Item</h2>
+        <div className="modal-overlay">
+          <div className="modal-card">
+            <h2 className="modal-title">Edit Menu Item</h2>
 
-            {/* ✅ Each input has a proper label — fixes axe/forms warning */}
-            <label htmlFor="edit-name" className="block text-sm font-medium mb-1">
-              Name
-            </label>
+            <label htmlFor="edit-name" className="modal-label">Name</label>
             <input
               id="edit-name"
-              className="w-full border rounded-lg p-2 mb-3"
+              className="modal-input"
               placeholder="Item name"
               value={editingItem.name}
               onChange={(e) => setEditingItem({ ...editingItem, name: e.target.value })}
             />
 
-            <label htmlFor="edit-description" className="block text-sm font-medium mb-1">
-              Description
-            </label>
+            <label htmlFor="edit-description" className="modal-label">Description</label>
             <textarea
               id="edit-description"
-              className="w-full border rounded-lg p-2 mb-3 resize-none"
+              className="modal-input"
               placeholder="Item description"
               rows={2}
+              style={{ resize: "none" }}
               value={editingItem.description || ""}
               onChange={(e) => setEditingItem({ ...editingItem, description: e.target.value })}
             />
 
-            <label htmlFor="edit-price" className="block text-sm font-medium mb-1">
-              Price
-            </label>
+            <label htmlFor="edit-price" className="modal-label">Price</label>
             <input
               id="edit-price"
               type="number"
-              className="w-full border rounded-lg p-2 mb-4"
+              className="modal-input"
               placeholder="0.00"
               value={editingItem.price}
               onChange={(e) =>
@@ -281,24 +535,17 @@ export default function OwnerMenuPage() {
               }
             />
 
-            <div className="flex justify-end gap-2">
-              <button
-                onClick={() => setEditingItem(null)}
-                className="px-4 py-2 rounded-lg border hover:bg-gray-100 transition"
-              >
+            <div className="modal-actions">
+              <button onClick={() => setEditingItem(null)} className="modal-cancel">
                 Cancel
               </button>
-              <button
-                onClick={handleSaveEdit}
-                className="px-4 py-2 rounded-lg bg-linear-to-r from-amber-600 to-amber-800 text-white hover:opacity-90 transition"
-              >
+              <button onClick={handleSaveEdit} className="modal-save">
                 Save Changes
               </button>
             </div>
           </div>
         </div>
       )}
-
-    </main>
+    </>
   );
 }

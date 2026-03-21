@@ -1,372 +1,595 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useCallback } from "react";
 import { supabase } from "@/lib/supabase/client";
 
-type AnalyticsSummary = {
-  totalOrders: number;
-  totalRevenue: number;
-  todayOrders: number;
-  todayRevenue: number;
-  totalViews: number;
-  popularItems: { name: string; count: number }[];
-  recentOrders: {
-    id: string;
-    customer_name: string;
-    total: number;
-    status: string;
-    created_at: string;
-  }[];
+type OrderItem = {
+  id: string;
+  menu_id: string;
+  quantity: number;
+  unit_price: number;
+  notes: string | null;
+  menus: { name: string } | null;
 };
 
-export default function OwnerDashboardPage() {
+type Order = {
+  id: string;
+  customer_name: string;
+  status: string;
+  payment_method: string;
+  total: number;
+  created_at: string;
+  order_items: OrderItem[];
+};
+
+export default function OwnerOrdersPage() {
   const [cafeId, setCafeId] = useState<string | null>(null);
-  const [data, setData] = useState<AnalyticsSummary | null>(null);
+  const [orders, setOrders] = useState<Order[]>([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [updatingId, setUpdatingId] = useState<string | null>(null);
+  const [filterStatus, setFilterStatus] = useState("active");
+  const [lastUpdated, setLastUpdated] = useState<Date>(new Date());
 
   useEffect(() => {
     const init = async () => {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) { window.location.href = "/owner/login"; return; }
+      try {
+        const { data: { user } } = await supabase.auth.getUser();
+        if (!user) { window.location.href = "/auth/signin"; return; }
 
-      const { data: profile } = await supabase
-        .from("profiles")
-        .select("cafe_id")
-        .eq("id", user.id)
-        .single();
+        const { data: profile, error: profileError } = await supabase
+          .from("profiles")
+          .select("cafe_id")
+          .eq("id", user.id)
+          .single();
 
-      if (!profile?.cafe_id) { window.location.href = "/owner/setup-cafe"; return; }
-      setCafeId(profile.cafe_id);
+        if (profileError) throw profileError;
+        if (!profile?.cafe_id) { window.location.href = "/auth/setup-cafe"; return; }
+        setCafeId(profile.cafe_id);
+      } catch (err) {
+        setError(err instanceof Error ? err.message : "Failed to load profile");
+        setLoading(false);
+      }
     };
     init();
   }, []);
 
-  useEffect(() => {
+  const fetchOrders = useCallback(async () => {
     if (!cafeId) return;
+    try {
+      const { data, error } = await supabase
+        .from("orders")
+        .select(`
+          id, customer_name, status, payment_method, total, created_at,
+          order_items (
+            id, menu_id, quantity, unit_price, notes,
+            menus ( name )
+          )
+        `)
+        .eq("cafe_id", cafeId)
+        .order("created_at", { ascending: false });
 
-    const fetchAnalytics = async () => {
-      try {
-        setLoading(true);
-
-        const today = new Date();
-        today.setHours(0, 0, 0, 0);
-
-        const { data: orders } = await supabase
-          .from("orders")
-          .select("id, customer_name, total, status, created_at")
-          .eq("cafe_id", cafeId)
-          .order("created_at", { ascending: false });
-
-        const { count: totalViews } = await supabase
-          .from("page_views")
-          .select("*", { count: "exact", head: true })
-          .eq("cafe_id", cafeId);
-
-        const { data: orderItems } = await supabase
-          .from("order_items")
-          .select("quantity, menus(name)")
-          .in("order_id", (orders || []).map((o) => o.id));
-
-        const itemMap: Record<string, number> = {};
-        (orderItems || []).forEach((oi: { quantity: number; menus: { name: string }[] | null }) => {
-          const name = oi.menus?.[0]?.name || "Unknown";
-          itemMap[name] = (itemMap[name] || 0) + oi.quantity;
-        });
-
-        const popularItems = Object.entries(itemMap)
-          .map(([name, count]) => ({ name, count }))
-          .sort((a, b) => b.count - a.count)
-          .slice(0, 5);
-
-        const allOrders = orders || [];
-        const todayOrders = allOrders.filter(
-          (o) => new Date(o.created_at) >= today
-        );
-
-        setData({
-          totalOrders: allOrders.length,
-          totalRevenue: allOrders.reduce((s, o) => s + o.total, 0),
-          todayOrders: todayOrders.length,
-          todayRevenue: todayOrders.reduce((s, o) => s + o.total, 0),
-          totalViews: totalViews || 0,
-          popularItems,
-          recentOrders: allOrders.slice(0, 5),
-        });
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    fetchAnalytics();
+      if (error) throw error;
+      setOrders((data as unknown as Order[]) || []);
+      setLastUpdated(new Date());
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Error loading orders");
+    } finally {
+      setLoading(false);
+    }
   }, [cafeId]);
 
-  const getStatusColor = (status: string) => {
-    switch (status) {
-      case "pending": return { bg: "rgba(255,180,0,0.12)", color: "#B87800" };
-      case "preparing": return { bg: "rgba(58,124,200,0.1)", color: "#2A6CB8" };
-      case "completed": return { bg: "rgba(40,160,90,0.1)", color: "#1A8A50" };
-      default: return { bg: "rgba(0,0,0,0.05)", color: "#888" };
+  // ✅ Auto-refresh every 30 seconds — owner sees new orders without manual reload
+  useEffect(() => {
+    if (!cafeId) return;
+    fetchOrders();
+    const interval = setInterval(fetchOrders, 30000);
+    return () => clearInterval(interval);
+  }, [cafeId, fetchOrders]);
+
+  const handleStatusUpdate = async (orderId: string, newStatus: string) => {
+    setUpdatingId(orderId);
+    try {
+      const { error } = await supabase
+        .from("orders")
+        .update({ status: newStatus })
+        .eq("id", orderId);
+
+      if (error) throw error;
+      setOrders((prev) =>
+        prev.map((o) => o.id === orderId ? { ...o, status: newStatus } : o)
+      );
+    } catch (err) {
+      alert("Failed to update order status.");
+      console.error(err);
+    } finally {
+      setUpdatingId(null);
     }
   };
 
-  if (loading) {
-    return (
-      <div style={{ display: "flex", alignItems: "center", justifyContent: "center", height: "60vh" }}>
-        <p style={{ color: "rgba(26,15,0,0.35)", fontFamily: "'DM Sans', sans-serif" }}>
-          Loading analytics...
-        </p>
-      </div>
-    );
-  }
+  const getStatusStyle = (status: string) => {
+    switch (status) {
+      case "pending": return { bg: "rgba(255,180,0,0.12)", color: "#B87800", label: "New Order" };
+      case "preparing": return { bg: "rgba(58,124,200,0.12)", color: "#2A6CB8", label: "Preparing" };
+      case "completed": return { bg: "rgba(40,160,90,0.12)", color: "#1A8A50", label: "Done" };
+      default: return { bg: "rgba(0,0,0,0.05)", color: "#888", label: status };
+    }
+  };
+
+  const formatTime = (dateStr: string) => {
+    return new Date(dateStr).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
+  };
+
+  const activeOrders = orders.filter((o) => o.status !== "completed");
+  const completedOrders = orders.filter((o) => o.status === "completed");
+  const pendingCount = orders.filter((o) => o.status === "pending").length;
+  const preparingCount = orders.filter((o) => o.status === "preparing").length;
+  const todayRevenue = completedOrders.reduce((s, o) => s + o.total, 0);
+
+  const filteredOrders = filterStatus === "active" ? activeOrders
+    : filterStatus === "completed" ? completedOrders
+    : orders;
 
   return (
     <>
       <style>{`
-        @import url('https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,300;0,600;1,600&family=DM+Sans:wght@300;400;500&display=swap');
+        @import url('https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@300;600&family=DM+Sans:wght@300;400;500&display=swap');
 
-        .dash {
-          font-family: 'DM Sans', sans-serif;
-          color: #1A0F00;
+        .orders-root { font-family: 'DM Sans', sans-serif; color: #1A0F00; }
+
+        .page-header {
+          display: flex;
+          justify-content: space-between;
+          align-items: center;
+          margin-bottom: 20px;
+          flex-wrap: wrap;
+          gap: 12px;
         }
 
-        .kpi-grid {
+        .page-title {
+          font-family: 'Cormorant Garamond', serif;
+          font-size: 28px;
+          font-weight: 600;
+          color: #1A0F00;
+          margin-bottom: 2px;
+        }
+
+        .page-sub {
+          font-size: 12px;
+          color: rgba(26,15,0,0.35);
+        }
+
+        .refresh-info {
+          display: flex;
+          align-items: center;
+          gap: 8px;
+        }
+
+        .refresh-btn {
+          display: flex;
+          align-items: center;
+          gap: 6px;
+          font-size: 12px;
+          color: rgba(26,15,0,0.4);
+          background: #ffffff;
+          border: 1px solid rgba(200,135,58,0.15);
+          padding: 6px 14px;
+          border-radius: 100px;
+          cursor: pointer;
+          font-family: 'DM Sans', sans-serif;
+          transition: all 0.2s;
+        }
+
+        .refresh-btn:hover { color: #C8873A; border-color: rgba(200,135,58,0.35); }
+
+        .last-updated {
+          font-size: 11px;
+          color: rgba(26,15,0,0.25);
+        }
+
+        /* KPI strip */
+        .kpi-strip {
           display: grid;
-          grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
-          gap: 16px;
-          margin-bottom: 32px;
+          grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+          gap: 12px;
+          margin-bottom: 24px;
         }
 
         .kpi-card {
           background: #ffffff;
-          border: 1px solid rgba(200,135,58,0.15);
-          border-radius: 16px;
-          padding: 24px;
-          transition: border-color 0.2s, box-shadow 0.2s;
-        }
-
-        .kpi-card:hover {
-          border-color: rgba(200,135,58,0.35);
-          box-shadow: 0 4px 16px rgba(200,135,58,0.08);
-        }
-
-        .kpi-label {
-          font-size: 11px;
-          letter-spacing: 0.15em;
-          text-transform: uppercase;
-          color: rgba(26,15,0,0.4);
-          margin-bottom: 10px;
+          border: 1px solid rgba(200,135,58,0.12);
+          border-radius: 14px;
+          padding: 16px;
+          box-shadow: 0 2px 6px rgba(0,0,0,0.03);
         }
 
         .kpi-value {
           font-family: 'Cormorant Garamond', serif;
-          font-size: 36px;
+          font-size: 28px;
           font-weight: 600;
-          color: #1A0F00;
           line-height: 1;
-          margin-bottom: 6px;
+          margin-bottom: 4px;
         }
 
-        .kpi-accent {
-          color: #C8873A;
-        }
-
-        .kpi-sub {
+        .kpi-label {
           font-size: 11px;
-          color: rgba(26,15,0,0.3);
+          color: rgba(26,15,0,0.35);
+          letter-spacing: 0.08em;
+          text-transform: uppercase;
         }
 
-        .bottom-grid {
-          display: grid;
-          grid-template-columns: 1fr 1fr;
-          gap: 20px;
-        }
-
-        .panel {
-          background: #ffffff;
-          border: 1px solid rgba(200,135,58,0.15);
-          border-radius: 16px;
-          padding: 24px;
-        }
-
-        .section-title {
-          font-family: 'Cormorant Garamond', serif;
-          font-size: 22px;
-          font-weight: 600;
-          color: #1A0F00;
+        /* Alert banner for new orders */
+        .new-orders-alert {
+          background: rgba(255,180,0,0.08);
+          border: 1px solid rgba(255,180,0,0.3);
+          border-radius: 12px;
+          padding: 12px 16px;
           margin-bottom: 16px;
-          letter-spacing: 0.02em;
-        }
-
-        .popular-item {
           display: flex;
           align-items: center;
-          justify-content: space-between;
-          padding: 10px 0;
-          border-bottom: 1px solid rgba(0,0,0,0.05);
-        }
-
-        .popular-item:last-child { border-bottom: none; }
-
-        .popular-name {
+          gap: 10px;
           font-size: 13px;
-          color: rgba(26,15,0,0.7);
-          min-width: 80px;
-        }
-
-        .popular-bar-wrap {
-          flex: 1;
-          margin: 0 16px;
-          height: 4px;
-          background: rgba(0,0,0,0.06);
-          border-radius: 2px;
-          overflow: hidden;
-        }
-
-        .popular-bar {
-          height: 100%;
-          background: linear-gradient(90deg, #C8873A, #E8A050);
-          border-radius: 2px;
-        }
-
-        .popular-count {
-          font-size: 12px;
-          color: #C8873A;
+          color: #B87800;
           font-weight: 500;
-          min-width: 24px;
-          text-align: right;
         }
 
-        .order-row {
+        .alert-dot {
+          width: 8px;
+          height: 8px;
+          background: #FFB400;
+          border-radius: 50%;
+          animation: pulse 1s infinite;
+          flex-shrink: 0;
+        }
+
+        @keyframes pulse {
+          0%, 100% { opacity: 1; transform: scale(1); }
+          50% { opacity: 0.4; transform: scale(0.8); }
+        }
+
+        /* Filters */
+        .filters {
+          display: flex;
+          gap: 6px;
+          margin-bottom: 20px;
+          flex-wrap: wrap;
+        }
+
+        .filter-btn {
+          padding: 7px 16px;
+          border-radius: 100px;
+          font-size: 12px;
+          font-weight: 500;
+          font-family: 'DM Sans', sans-serif;
+          cursor: pointer;
+          transition: all 0.2s;
+          border: 1px solid rgba(200,135,58,0.2);
+          background: #ffffff;
+          color: rgba(26,15,0,0.45);
+        }
+
+        .filter-btn:hover { color: #C8873A; border-color: rgba(200,135,58,0.35); }
+        .filter-btn.active { background: #C8873A; color: #ffffff; border-color: #C8873A; }
+
+        /* Order cards */
+        .orders-list { display: flex; flex-direction: column; gap: 12px; }
+
+        .order-card {
+          background: #ffffff;
+          border: 1px solid rgba(200,135,58,0.12);
+          border-radius: 18px;
+          overflow: hidden;
+          box-shadow: 0 2px 8px rgba(0,0,0,0.03);
+          transition: box-shadow 0.2s;
+        }
+
+        .order-card.pending {
+          border-left: 4px solid #FFB400;
+          box-shadow: 0 2px 12px rgba(255,180,0,0.1);
+        }
+
+        .order-card.preparing { border-left: 4px solid #3A7CC8; }
+        .order-card.completed { border-left: 4px solid #3AC87C; opacity: 0.75; }
+
+        .order-top {
+          display: flex;
+          align-items: flex-start;
+          justify-content: space-between;
+          padding: 16px 20px 12px;
+          gap: 12px;
+          flex-wrap: wrap;
+        }
+
+        .order-customer-row {
           display: flex;
           align-items: center;
-          justify-content: space-between;
-          padding: 10px 0;
-          border-bottom: 1px solid rgba(0,0,0,0.05);
-          gap: 12px;
+          gap: 10px;
+          margin-bottom: 4px;
+          flex-wrap: wrap;
         }
-
-        .order-row:last-child { border-bottom: none; }
 
         .order-customer {
-          font-size: 13px;
-          color: rgba(26,15,0,0.7);
-          flex: 1;
-          overflow: hidden;
-          text-overflow: ellipsis;
-          white-space: nowrap;
-        }
-
-        .order-total {
-          font-size: 13px;
-          color: #C8873A;
+          font-size: 16px;
           font-weight: 500;
-          white-space: nowrap;
+          color: #1A0F00;
         }
 
         .status-badge {
           font-size: 10px;
-          font-weight: 500;
-          letter-spacing: 0.08em;
+          font-weight: 600;
+          letter-spacing: 0.1em;
           text-transform: uppercase;
           padding: 3px 10px;
           border-radius: 100px;
-          white-space: nowrap;
+        }
+
+        .order-time {
+          font-size: 12px;
+          color: rgba(26,15,0,0.35);
+        }
+
+        .order-summary {
+          text-align: right;
+        }
+
+        .order-total {
+          font-family: 'Cormorant Garamond', serif;
+          font-size: 24px;
+          font-weight: 600;
+          color: #C8873A;
+          line-height: 1;
+        }
+
+        .order-payment-method {
+          font-size: 11px;
+          color: rgba(26,15,0,0.3);
+          text-transform: uppercase;
+          letter-spacing: 0.06em;
+          margin-top: 2px;
+        }
+
+        /* Items — always visible, no expand needed */
+        .order-items {
+          padding: 0 20px 12px;
+          display: flex;
+          flex-direction: column;
+          gap: 6px;
+        }
+
+        .item-chip {
+          display: inline-flex;
+          align-items: center;
+          gap: 6px;
+          background: #F7F3EE;
+          border: 1px solid rgba(200,135,58,0.1);
+          border-radius: 8px;
+          padding: 6px 12px;
+          font-size: 13px;
+          color: #1A0F00;
+        }
+
+        .item-qty {
+          font-size: 11px;
+          font-weight: 600;
+          color: #C8873A;
+          background: rgba(200,135,58,0.1);
+          border-radius: 4px;
+          padding: 1px 6px;
+        }
+
+        .item-notes {
+          font-size: 11px;
+          color: rgba(26,15,0,0.4);
+        }
+
+        /* Action bar */
+        .order-actions {
+          display: flex;
+          gap: 8px;
+          padding: 12px 20px 16px;
+          border-top: 1px solid rgba(200,135,58,0.06);
+          flex-wrap: wrap;
+        }
+
+        .action-btn {
+          flex: 1;
+          padding: 10px 16px;
+          border-radius: 100px;
+          font-size: 12px;
+          font-weight: 500;
+          font-family: 'DM Sans', sans-serif;
+          cursor: pointer;
+          transition: all 0.2s;
+          border: 1px solid;
+          letter-spacing: 0.04em;
+          text-align: center;
+          min-width: 120px;
+        }
+
+        .action-btn.start {
+          background: rgba(255,180,0,0.1);
+          color: #B87800;
+          border-color: rgba(255,180,0,0.35);
+        }
+
+        .action-btn.start:hover { background: rgba(255,180,0,0.18); }
+
+        .action-btn.complete {
+          background: #1A8A50;
+          color: #ffffff;
+          border-color: #1A8A50;
+          box-shadow: 0 4px 12px rgba(40,160,90,0.2);
+        }
+
+        .action-btn.complete:hover { opacity: 0.88; }
+
+        .action-btn.done-label {
+          background: rgba(40,160,90,0.08);
+          color: #1A8A50;
+          border-color: rgba(40,160,90,0.2);
+          cursor: default;
+        }
+
+        .action-btn:disabled {
+          opacity: 0.4;
+          cursor: not-allowed;
         }
 
         .empty-state {
+          text-align: center;
+          padding: 48px 0;
           font-size: 13px;
           color: rgba(26,15,0,0.25);
-          text-align: center;
-          padding: 24px 0;
         }
 
-        @media (max-width: 768px) {
-          .bottom-grid { grid-template-columns: 1fr; }
-          .kpi-grid { grid-template-columns: 1fr 1fr; }
+        .status-msg {
+          text-align: center;
+          padding: 32px 0;
+          font-size: 13px;
+          color: rgba(26,15,0,0.35);
         }
       `}</style>
 
-      <div className="dash">
-        {/* KPI Cards */}
-        <div className="kpi-grid">
-          <div className="kpi-card">
-            <p className="kpi-label">Total Orders</p>
-            <p className="kpi-value">{data?.totalOrders ?? 0}</p>
-            <p className="kpi-sub">All time</p>
+      <div className="orders-root">
+        {/* Header */}
+        <div className="page-header">
+          <div>
+            <h1 className="page-title">Orders</h1>
+            <p className="page-sub">Auto-refreshes every 30 seconds</p>
           </div>
-          <div className="kpi-card">
-            <p className="kpi-label">Total Revenue</p>
-            <p className="kpi-value kpi-accent">
-              ${data?.totalRevenue.toFixed(2) ?? "0.00"}
-            </p>
-            <p className="kpi-sub">All time</p>
-          </div>
-          <div className="kpi-card">
-            <p className="kpi-label">Today&apos;s Orders</p>
-            <p className="kpi-value">{data?.todayOrders ?? 0}</p>
-            <p className="kpi-sub">Since midnight</p>
-          </div>
-          <div className="kpi-card">
-            <p className="kpi-label">Today&apos;s Revenue</p>
-            <p className="kpi-value kpi-accent">
-              ${data?.todayRevenue.toFixed(2) ?? "0.00"}
-            </p>
-            <p className="kpi-sub">Since midnight</p>
-          </div>
-          <div className="kpi-card">
-            <p className="kpi-label">Menu Page Views</p>
-            <p className="kpi-value">{data?.totalViews ?? 0}</p>
-            <p className="kpi-sub">QR scans total</p>
+          <div className="refresh-info">
+            <span className="last-updated">
+              Updated {lastUpdated.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
+            </span>
+            <button className="refresh-btn" onClick={fetchOrders}>
+              ↻ Refresh
+            </button>
           </div>
         </div>
 
-        {/* Bottom panels */}
-        <div className="bottom-grid">
-          <div className="panel">
-            <h2 className="section-title">Popular Items</h2>
-            {data?.popularItems.length === 0 ? (
-              <p className="empty-state">No order data yet</p>
-            ) : (
-              data?.popularItems.map((item, i) => {
-                const max = data.popularItems[0]?.count || 1;
-                return (
-                  <div key={i} className="popular-item">
-                    <span className="popular-name">{item.name}</span>
-                    <div className="popular-bar-wrap">
-                      <div
-                        className="popular-bar"
-                        style={{ width: `${(item.count / max) * 100}%` }}
-                      />
-                    </div>
-                    <span className="popular-count">×{item.count}</span>
-                  </div>
-                );
-              })
-            )}
+        {/* KPI strip */}
+        {!loading && (
+          <div className="kpi-strip">
+            <div className="kpi-card">
+              <p className="kpi-value" style={{ color: "#B87800" }}>{pendingCount}</p>
+              <p className="kpi-label">New Orders</p>
+            </div>
+            <div className="kpi-card">
+              <p className="kpi-value" style={{ color: "#2A6CB8" }}>{preparingCount}</p>
+              <p className="kpi-label">Preparing</p>
+            </div>
+            <div className="kpi-card">
+              <p className="kpi-value" style={{ color: "#C8873A" }}>${todayRevenue.toFixed(2)}</p>
+              <p className="kpi-label">Collected</p>
+            </div>
+            <div className="kpi-card">
+              <p className="kpi-value">{orders.length}</p>
+              <p className="kpi-label">Total Today</p>
+            </div>
           </div>
+        )}
 
-          <div className="panel">
-            <h2 className="section-title">Recent Orders</h2>
-            {data?.recentOrders.length === 0 ? (
-              <p className="empty-state">No orders yet</p>
-            ) : (
-              data?.recentOrders.map((order) => {
-                const s = getStatusColor(order.status);
-                return (
-                  <div key={order.id} className="order-row">
-                    <span className="order-customer">{order.customer_name}</span>
-                    <span className="order-total">${order.total.toFixed(2)}</span>
-                    <span
-                      className="status-badge"
-                      style={{ background: s.bg, color: s.color }}
-                    >
-                      {order.status}
-                    </span>
-                  </div>
-                );
-              })
-            )}
+        {/* Alert for pending orders */}
+        {pendingCount > 0 && (
+          <div className="new-orders-alert">
+            <span className="alert-dot" />
+            {pendingCount} new order{pendingCount > 1 ? "s" : ""} waiting — tap &quot;Start Preparing&quot; to begin
           </div>
+        )}
+
+        {/* Filters */}
+        <div className="filters">
+          {[
+            { key: "active", label: `Active (${activeOrders.length})` },
+            { key: "completed", label: `Completed (${completedOrders.length})` },
+            { key: "all", label: "All Orders" },
+          ].map((f) => (
+            <button
+              key={f.key}
+              onClick={() => setFilterStatus(f.key)}
+              className={`filter-btn ${filterStatus === f.key ? "active" : ""}`}
+            >
+              {f.label}
+            </button>
+          ))}
+        </div>
+
+        {loading && <p className="status-msg">Loading orders…</p>}
+
+        {!loading && filteredOrders.length === 0 && (
+          <p className="empty-state">
+            {filterStatus === "active" ? "No active orders right now." : "No orders found."}
+          </p>
+        )}
+
+        {/* Orders list */}
+        <div className="orders-list">
+          {filteredOrders.map((order) => {
+            const s = getStatusStyle(order.status);
+            return (
+              <div key={order.id} className={`order-card ${order.status}`}>
+
+                {/* Top row */}
+                <div className="order-top">
+                  <div>
+                    <div className="order-customer-row">
+                      <span className="order-customer">{order.customer_name}</span>
+                      <span
+                        className="status-badge"
+                        style={{ background: s.bg, color: s.color }}
+                      >
+                        {s.label}
+                      </span>
+                    </div>
+                    <p className="order-time">{formatTime(order.created_at)}</p>
+                  </div>
+                  <div className="order-summary">
+                    <p className="order-total">${order.total.toFixed(2)}</p>
+                    <p className="order-payment-method">{order.payment_method}</p>
+                  </div>
+                </div>
+
+                {/* Items — always visible so owner knows what to make */}
+                <div className="order-items">
+                  {order.order_items.map((item) => (
+                    <div key={item.id} className="item-chip">
+                      <span className="item-qty">×{item.quantity}</span>
+                      <span>{item.menus?.name || "Unknown"}</span>
+                      {item.notes && (
+                        <span className="item-notes">— {item.notes}</span>
+                      )}
+                    </div>
+                  ))}
+                </div>
+
+                {/* Action buttons */}
+                <div className="order-actions">
+                  {order.status === "pending" && (
+                    <button
+                      className="action-btn start"
+                      disabled={updatingId === order.id}
+                      onClick={() => handleStatusUpdate(order.id, "preparing")}
+                    >
+                      {updatingId === order.id ? "Updating..." : "▶ Start Preparing"}
+                    </button>
+                  )}
+                  {order.status === "preparing" && (
+                    <button
+                      className="action-btn complete"
+                      disabled={updatingId === order.id}
+                      onClick={() => handleStatusUpdate(order.id, "completed")}
+                    >
+                      {updatingId === order.id ? "Updating..." : "✓ Mark as Completed"}
+                    </button>
+                  )}
+                  {order.status === "completed" && (
+                    <span className="action-btn done-label">✓ Completed & Paid</span>
+                  )}
+                </div>
+
+              </div>
+            );
+          })}
         </div>
       </div>
     </>
