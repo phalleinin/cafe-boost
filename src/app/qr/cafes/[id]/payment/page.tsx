@@ -369,15 +369,7 @@ export default function PaymentPage() {
 
               {/* Form */}
               <div className="form-section">
-                <label htmlFor="customer-name" className="field-label">Your Name</label>
-                <input
-                  id="customer-name"
-                  type="text"
-                  placeholder="Enter your name"
-                  className="field-input"
-                  value={customerName}
-                  onChange={(e) => setCustomerName(e.target.value)}
-                />
+               
 
                 <label htmlFor="payment-method" className="field-label">Payment Method</label>
                 <select

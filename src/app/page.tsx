@@ -93,7 +93,7 @@ export default function HomePage() {
 
         /* HERO */
         .hero {
-          padding: 50px 80px;
+          padding: 32px 80px;
           text-align: center;
           max-width: 900px;
           margin: 0 auto;
@@ -112,7 +112,7 @@ export default function HomePage() {
           text-transform: uppercase;
           padding: 7px 18px;
           border-radius: 100px;
-          margin-bottom: 36px;
+          margin-bottom: 24px;
         }
 
         .hero-badge-dot {
@@ -151,7 +151,7 @@ export default function HomePage() {
           font-weight: 300;
           line-height: 1.7;
           max-width: 520px;
-          margin: 24px auto 52px;
+          margin: 16px auto 32px;
         }
 
         /* FEATURES STRIP */
@@ -159,7 +159,7 @@ export default function HomePage() {
           border-top: 1px solid rgba(200,135,58,0.15);
           border-bottom: 1px solid rgba(200,135,58,0.15);
           background: #ffffff;
-          padding: 20px 48px;
+          padding: 16px 48px;
           display: flex;
           align-items: center;
           justify-content: center;
@@ -425,7 +425,6 @@ export default function HomePage() {
               { icon: "◈", label: "QR Menu Ordering" },
               { icon: "◎", label: "Real-time Order Queue" },
               { icon: "◉", label: "Sales Analytics" },
-              { icon: "▣", label: "Barista Management" },
             ].map((f) => (
               <div key={f.label} className="strip-item">
                 <span className="strip-icon">{f.icon}</span>
@@ -433,60 +432,6 @@ export default function HomePage() {
               </div>
             ))}
           </div>
-
-          {/* Role cards */}
-          <section className="cards-section" style={{ marginTop: 64 }}>
-            <p className="cards-label">Choose your role to get started</p>
-            <div className="cards-grid">
-
-              {/* Owner */}
-              <Link href="/owner" className="role-card owner">
-                <div className="role-card-inner">
-                  <div className="role-icon-wrap">🧑‍💼</div>
-                  <h2 className="role-title">Shop Owner</h2>
-                  <p className="role-desc">
-                    Take full control of your café — from menus to analytics to staff management.
-                  </p>
-                  <ul className="role-features">
-                    {["Menu & item management", "QR code generation", "Orders & revenue tracking", "Barista access control"].map((f) => (
-                      <li key={f}>
-                        <span className="feature-dot" />
-                        {f}
-                      </li>
-                    ))}
-                  </ul>
-                  <span className="role-btn">
-                    Enter Dashboard
-                    <span className="role-btn-arrow">→</span>
-                  </span>
-                </div>
-              </Link>
-
-              {/* Barista */}
-              <Link href="/barista" className="role-card barista">
-                <div className="role-card-inner">
-                  <div className="role-icon-wrap">👩‍🍳</div>
-                  <h2 className="role-title">Barista</h2>
-                  <p className="role-desc">
-                    Stay on top of incoming orders and deliver every drink with precision and speed.
-                  </p>
-                  <ul className="role-features">
-                    {["Live order queue", "Payment verification", "Popular items feed", "Menu availability toggle"].map((f) => (
-                      <li key={f}>
-                        <span className="feature-dot" />
-                        {f}
-                      </li>
-                    ))}
-                  </ul>
-                  <span className="role-btn">
-                    Enter Station
-                    <span className="role-btn-arrow">→</span>
-                  </span>
-                </div>
-              </Link>
-
-            </div>
-          </section>
 
           {/* Footer */}
           <footer>
