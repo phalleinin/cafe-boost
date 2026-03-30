@@ -13,50 +13,51 @@ export default function PaymentPage() {
 
   const [cart, setCart] = useState<CartItem[]>([]);
   const [mounted, setMounted] = useState(false);
-  const [customerName, setCustomerName] = useState("");
   const [paymentMethod, setPaymentMethod] = useState("cash");
   const [placing, setPlacing] = useState(false);
+  const [customerName, setCustomerName] = useState("");
 
   useEffect(() => {
     const savedCart = localStorage.getItem("cart");
-    if (savedCart) {
-      setCart(JSON.parse(savedCart));
-    }
+    if (savedCart) setCart(JSON.parse(savedCart));
+
+    const savedName = localStorage.getItem("customer_name");
+    if (savedName) setCustomerName(savedName);
+
     setMounted(true);
   }, []);
 
-  const total = cart.reduce(
-    (sum, item) => sum + item.price * item.quantity,
-    0
-  );
+  useEffect(() => {
+    localStorage.setItem("customer_name", customerName);
+  }, [customerName]);
+
+  const total = cart.reduce((sum, item) => sum + item.price * item.quantity, 0);
 
   const handlePayNow = async () => {
     if (!cafeId || cart.length === 0) return;
 
-    if (!customerName.trim()) {
-      alert("Please enter your name before confirming.");
-      return;
-    }
-
     try {
       setPlacing(true);
 
-      const { data: order, error: orderError } = await supabase
+      const orderId = crypto.randomUUID();
+
+      // 1️⃣ Insert order — status "pending" so owner sees it immediately
+      const { error: orderError } = await supabase
         .from("orders")
         .insert({
+          id: orderId,
           cafe_id: cafeId,
-          customer_name: customerName.trim(),
+          customer_name: customerName.trim() || "Guest",
           total,
           payment_method: paymentMethod,
           status: "pending",
-        })
-        .select()
-        .single();
+        });
 
       if (orderError) throw orderError;
 
+      // 2️⃣ Insert order items
       const itemsToInsert = cart.map((item) => ({
-        order_id: order.id,
+        order_id: orderId,
         menu_id: item.id,
         quantity: item.quantity,
         unit_price: item.price,
@@ -80,15 +81,11 @@ export default function PaymentPage() {
     }
   };
 
-  // Group cart items by id + sugarLevel
   const groupedCart = Object.values(
     cart.reduce((acc, item) => {
       const key = `${item.id}-${item.sugarLevel}`;
-      if (!acc[key]) {
-        acc[key] = { ...item };
-      } else {
-        acc[key].quantity += item.quantity;
-      }
+      if (!acc[key]) acc[key] = { ...item };
+      else acc[key].quantity += item.quantity;
       return acc;
     }, {} as Record<string, CartItem>)
   );
@@ -108,10 +105,7 @@ export default function PaymentPage() {
           padding: 48px 24px;
         }
 
-        .payment-inner {
-          max-width: 560px;
-          margin: 0 auto;
-        }
+        .payment-inner { max-width: 560px; margin: 0 auto; }
 
         .payment-logo {
           font-family: 'Cormorant Garamond', serif;
@@ -155,7 +149,6 @@ export default function PaymentPage() {
           color: rgba(26,15,0,0.3);
         }
 
-        /* Cart items */
         .cart-list {
           display: flex;
           flex-direction: column;
@@ -175,9 +168,7 @@ export default function PaymentPage() {
           transition: border-color 0.2s;
         }
 
-        .cart-item:hover {
-          border-color: rgba(200,135,58,0.25);
-        }
+        .cart-item:hover { border-color: rgba(200,135,58,0.25); }
 
         .item-name {
           font-size: 14px;
@@ -186,10 +177,7 @@ export default function PaymentPage() {
           margin-bottom: 3px;
         }
 
-        .item-notes {
-          font-size: 12px;
-          color: rgba(26,15,0,0.35);
-        }
+        .item-notes { font-size: 12px; color: rgba(26,15,0,0.35); }
 
         .item-price {
           font-family: 'Cormorant Garamond', serif;
@@ -200,13 +188,8 @@ export default function PaymentPage() {
           text-align: right;
         }
 
-        .item-qty {
-          font-size: 11px;
-          color: rgba(26,15,0,0.35);
-          text-align: right;
-        }
+        .item-qty { font-size: 11px; color: rgba(26,15,0,0.35); text-align: right; }
 
-        /* Total */
         .total-row {
           display: flex;
           justify-content: space-between;
@@ -233,7 +216,6 @@ export default function PaymentPage() {
           color: #C8873A;
         }
 
-        /* Form */
         .form-section {
           background: #ffffff;
           border: 1px solid rgba(200,135,58,0.12);
@@ -266,10 +248,7 @@ export default function PaymentPage() {
           margin-bottom: 20px;
         }
 
-        .field-input::placeholder {
-          color: rgba(26,15,0,0.22);
-        }
-
+        .field-input::placeholder { color: rgba(26,15,0,0.22); }
         .field-input:focus {
           border-color: rgba(200,135,58,0.45);
           box-shadow: 0 0 0 3px rgba(200,135,58,0.08);
@@ -297,7 +276,6 @@ export default function PaymentPage() {
           background: #ffffff;
         }
 
-        /* Confirm button */
         .confirm-btn {
           width: 100%;
           padding: 15px;
@@ -315,22 +293,12 @@ export default function PaymentPage() {
           text-transform: uppercase;
         }
 
-        .confirm-btn:hover:not(:disabled) {
-          opacity: 0.88;
-          transform: translateY(-1px);
-        }
-
-        .confirm-btn:disabled {
-          opacity: 0.5;
-          cursor: not-allowed;
-          box-shadow: none;
-        }
+        .confirm-btn:hover:not(:disabled) { opacity: 0.88; transform: translateY(-1px); }
+        .confirm-btn:disabled { opacity: 0.5; cursor: not-allowed; box-shadow: none; }
       `}</style>
 
       <div className="payment-root">
         <div className="payment-inner">
-
-          {/* Logo */}
           <div className="payment-logo">
             <span className="logo-dot" />
             CafeBoost
@@ -343,15 +311,12 @@ export default function PaymentPage() {
             <p className="empty-state">Your cart is empty.</p>
           ) : (
             <>
-              {/* Cart items */}
               <div className="cart-list">
                 {groupedCart.map((item, index) => (
-                  <div key={`${item.id}-${item.sugarLevel}-${index}`} className="cart-item">
+                  <div key={index} className="cart-item">
                     <div>
                       <p className="item-name">{item.name}</p>
-                      <p className="item-notes">
-                        Notes: {item.sugarLevel || "—"}
-                      </p>
+                      <p className="item-notes">Notes: {item.sugarLevel || "—"}</p>
                     </div>
                     <div>
                       <p className="item-price">${(item.price * item.quantity).toFixed(2)}</p>
@@ -361,15 +326,21 @@ export default function PaymentPage() {
                 ))}
               </div>
 
-              {/* Total */}
               <div className="total-row">
                 <span className="total-label">Total</span>
                 <span className="total-value">${total.toFixed(2)}</span>
               </div>
 
-              {/* Form */}
               <div className="form-section">
-               
+                <label htmlFor="customer-name" className="field-label">Your Name</label>
+                <input
+                  id="customer-name"
+                  type="text"
+                  placeholder="Enter your name"
+                  className="field-input"
+                  value={customerName}
+                  onChange={(e) => setCustomerName(e.target.value)}
+                />
 
                 <label htmlFor="payment-method" className="field-label">Payment Method</label>
                 <select
@@ -380,11 +351,9 @@ export default function PaymentPage() {
                 >
                   <option value="cash">Cash</option>
                   <option value="khqr">KHQR</option>
-                  <option value="aba">ABA Pay</option>
                 </select>
               </div>
 
-              {/* Confirm button */}
               <button
                 onClick={handlePayNow}
                 disabled={placing}

@@ -8,7 +8,6 @@ type AnalyticsSummary = {
   totalRevenue: number;
   todayOrders: number;
   todayRevenue: number;
-  totalViews: number;
   popularItems: { name: string; count: number }[];
   recentOrders: {
     id: string;
@@ -27,7 +26,7 @@ export default function OwnerAnalyticPage() {
   useEffect(() => {
     const init = async () => {
       const { data: { user } } = await supabase.auth.getUser();
-      if (!user) { window.location.href = "/owner/login"; return; }
+      if (!user) { window.location.href = "/auth/signin"; return; }
 
       const { data: profile } = await supabase
         .from("profiles")
@@ -35,7 +34,7 @@ export default function OwnerAnalyticPage() {
         .eq("id", user.id)
         .single();
 
-      if (!profile?.cafe_id) { window.location.href = "/owner/setup-cafe"; return; }
+      if (!profile?.cafe_id) { window.location.href = "/auth/setup-cafe"; return; }
       setCafeId(profile.cafe_id);
     };
     init();
@@ -56,11 +55,6 @@ export default function OwnerAnalyticPage() {
           .select("id, customer_name, total, status, created_at")
           .eq("cafe_id", cafeId)
           .order("created_at", { ascending: false });
-
-        const { count: totalViews } = await supabase
-          .from("page_views")
-          .select("*", { count: "exact", head: true })
-          .eq("cafe_id", cafeId);
 
         const { data: orderItems } = await supabase
           .from("order_items")
@@ -88,7 +82,6 @@ export default function OwnerAnalyticPage() {
           totalRevenue: allOrders.reduce((s, o) => s + o.total, 0),
           todayOrders: todayOrders.length,
           todayRevenue: todayOrders.reduce((s, o) => s + o.total, 0),
-          totalViews: totalViews || 0,
           popularItems,
           recentOrders: allOrders.slice(0, 5),
         });
@@ -124,10 +117,7 @@ export default function OwnerAnalyticPage() {
       <style>{`
         @import url('https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,300;0,600;1,600&family=DM+Sans:wght@300;400;500&display=swap');
 
-        .dash {
-          font-family: 'DM Sans', sans-serif;
-          color: #1A0F00;
-        }
+        .dash { font-family: 'DM Sans', sans-serif; color: #1A0F00; }
 
         .kpi-grid {
           display: grid;
@@ -166,9 +156,7 @@ export default function OwnerAnalyticPage() {
           margin-bottom: 6px;
         }
 
-        .kpi-accent {
-          color: #C8873A;
-        }
+        .kpi-accent { color: #C8873A; }
 
         .kpi-sub {
           font-size: 11px;
@@ -287,7 +275,7 @@ export default function OwnerAnalyticPage() {
       `}</style>
 
       <div className="dash">
-        {/* KPI Cards */}
+        {/* KPI Cards — removed totalViews card */}
         <div className="kpi-grid">
           <div className="kpi-card">
             <p className="kpi-label">Total Orders</p>
@@ -312,11 +300,6 @@ export default function OwnerAnalyticPage() {
               ${data?.todayRevenue.toFixed(2) ?? "0.00"}
             </p>
             <p className="kpi-sub">Since midnight</p>
-          </div>
-          <div className="kpi-card">
-            <p className="kpi-label">Menu Page Views</p>
-            <p className="kpi-value">{data?.totalViews ?? 0}</p>
-            <p className="kpi-sub">QR scans total</p>
           </div>
         </div>
 

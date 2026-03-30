@@ -12,10 +12,12 @@ type OrderItem = {
   menus: { name: string } | null;
 };
 
+type OrderStatus = "pending" | "preparing" | "completed";
+
 type Order = {
   id: string;
   customer_name: string;
-  status: string;
+  status: OrderStatus;
   payment_method: string;
   total: number;
   created_at: string;
@@ -79,7 +81,7 @@ export default function OwnerOrdersPage() {
     }
   }, [cafeId]);
 
-  // ✅ Auto-refresh every 30 seconds — owner sees new orders without manual reload
+  // ✅ Auto-refresh every 30 seconds
   useEffect(() => {
     if (!cafeId) return;
     fetchOrders();
@@ -97,7 +99,7 @@ export default function OwnerOrdersPage() {
 
       if (error) throw error;
       setOrders((prev) =>
-        prev.map((o) => o.id === orderId ? { ...o, status: newStatus } : o)
+        prev.map((o) => o.id === orderId ? { ...o, status: newStatus as OrderStatus } : o)
       );
     } catch (err) {
       alert("Failed to update order status.");
@@ -107,18 +109,8 @@ export default function OwnerOrdersPage() {
     }
   };
 
-  const getStatusStyle = (status: string) => {
-    switch (status) {
-      case "pending": return { bg: "rgba(255,180,0,0.12)", color: "#B87800", label: "New Order" };
-      case "preparing": return { bg: "rgba(58,124,200,0.12)", color: "#2A6CB8", label: "Preparing" };
-      case "completed": return { bg: "rgba(40,160,90,0.12)", color: "#1A8A50", label: "Done" };
-      default: return { bg: "rgba(0,0,0,0.05)", color: "#888", label: status };
-    }
-  };
-
-  const formatTime = (dateStr: string) => {
-    return new Date(dateStr).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
-  };
+  const formatTime = (dateStr: string) =>
+    new Date(dateStr).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
 
   const activeOrders = orders.filter((o) => o.status !== "completed");
   const completedOrders = orders.filter((o) => o.status === "completed");
@@ -154,16 +146,9 @@ export default function OwnerOrdersPage() {
           margin-bottom: 2px;
         }
 
-        .page-sub {
-          font-size: 12px;
-          color: rgba(26,15,0,0.35);
-        }
+        .page-sub { font-size: 12px; color: rgba(26,15,0,0.35); }
 
-        .refresh-info {
-          display: flex;
-          align-items: center;
-          gap: 8px;
-        }
+        .refresh-info { display: flex; align-items: center; gap: 8px; }
 
         .refresh-btn {
           display: flex;
@@ -181,13 +166,8 @@ export default function OwnerOrdersPage() {
         }
 
         .refresh-btn:hover { color: #C8873A; border-color: rgba(200,135,58,0.35); }
+        .last-updated { font-size: 11px; color: rgba(26,15,0,0.25); }
 
-        .last-updated {
-          font-size: 11px;
-          color: rgba(26,15,0,0.25);
-        }
-
-        /* KPI strip */
         .kpi-strip {
           display: grid;
           grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
@@ -209,6 +189,7 @@ export default function OwnerOrdersPage() {
           font-weight: 600;
           line-height: 1;
           margin-bottom: 4px;
+          color: #1A0F00;
         }
 
         .kpi-label {
@@ -218,8 +199,7 @@ export default function OwnerOrdersPage() {
           text-transform: uppercase;
         }
 
-        /* Alert banner for new orders */
-        .new-orders-alert {
+        .alert-banner {
           background: rgba(255,180,0,0.08);
           border: 1px solid rgba(255,180,0,0.3);
           border-radius: 12px;
@@ -247,7 +227,6 @@ export default function OwnerOrdersPage() {
           50% { opacity: 0.4; transform: scale(0.8); }
         }
 
-        /* Filters */
         .filters {
           display: flex;
           gap: 6px;
@@ -271,7 +250,6 @@ export default function OwnerOrdersPage() {
         .filter-btn:hover { color: #C8873A; border-color: rgba(200,135,58,0.35); }
         .filter-btn.active { background: #C8873A; color: #ffffff; border-color: #C8873A; }
 
-        /* Order cards */
         .orders-list { display: flex; flex-direction: column; gap: 12px; }
 
         .order-card {
@@ -280,14 +258,9 @@ export default function OwnerOrdersPage() {
           border-radius: 18px;
           overflow: hidden;
           box-shadow: 0 2px 8px rgba(0,0,0,0.03);
-          transition: box-shadow 0.2s;
         }
 
-        .order-card.pending {
-          border-left: 4px solid #FFB400;
-          box-shadow: 0 2px 12px rgba(255,180,0,0.1);
-        }
-
+        .order-card.pending { border-left: 4px solid #FFB400; }
         .order-card.preparing { border-left: 4px solid #3A7CC8; }
         .order-card.completed { border-left: 4px solid #3AC87C; opacity: 0.75; }
 
@@ -308,11 +281,7 @@ export default function OwnerOrdersPage() {
           flex-wrap: wrap;
         }
 
-        .order-customer {
-          font-size: 16px;
-          font-weight: 500;
-          color: #1A0F00;
-        }
+        .order-customer { font-size: 16px; font-weight: 500; color: #1A0F00; }
 
         .status-badge {
           font-size: 10px;
@@ -323,14 +292,13 @@ export default function OwnerOrdersPage() {
           border-radius: 100px;
         }
 
-        .order-time {
-          font-size: 12px;
-          color: rgba(26,15,0,0.35);
-        }
+        .status-badge.pending { background: rgba(255,180,0,0.12); color: #B87800; }
+        .status-badge.preparing { background: rgba(58,124,200,0.12); color: #2A6CB8; }
+        .status-badge.completed { background: rgba(40,160,90,0.12); color: #1A8A50; }
 
-        .order-summary {
-          text-align: right;
-        }
+        .order-time { font-size: 12px; color: rgba(26,15,0,0.35); }
+
+        .order-summary { text-align: right; }
 
         .order-total {
           font-family: 'Cormorant Garamond', serif;
@@ -348,7 +316,6 @@ export default function OwnerOrdersPage() {
           margin-top: 2px;
         }
 
-        /* Items — always visible, no expand needed */
         .order-items {
           padding: 0 20px 12px;
           display: flex;
@@ -377,12 +344,8 @@ export default function OwnerOrdersPage() {
           padding: 1px 6px;
         }
 
-        .item-notes {
-          font-size: 11px;
-          color: rgba(26,15,0,0.4);
-        }
+        .item-notes { font-size: 11px; color: rgba(26,15,0,0.4); }
 
-        /* Action bar */
         .order-actions {
           display: flex;
           gap: 8px;
@@ -406,13 +369,13 @@ export default function OwnerOrdersPage() {
           min-width: 120px;
         }
 
-        .action-btn.start {
+        .action-btn.prepare {
           background: rgba(255,180,0,0.1);
           color: #B87800;
           border-color: rgba(255,180,0,0.35);
         }
 
-        .action-btn.start:hover { background: rgba(255,180,0,0.18); }
+        .action-btn.prepare:hover { background: rgba(255,180,0,0.18); }
 
         .action-btn.complete {
           background: #1A8A50;
@@ -430,10 +393,7 @@ export default function OwnerOrdersPage() {
           cursor: default;
         }
 
-        .action-btn:disabled {
-          opacity: 0.4;
-          cursor: not-allowed;
-        }
+        .action-btn:disabled { opacity: 0.4; cursor: not-allowed; }
 
         .empty-state {
           text-align: center;
@@ -451,7 +411,6 @@ export default function OwnerOrdersPage() {
       `}</style>
 
       <div className="orders-root">
-        {/* Header */}
         <div className="page-header">
           <div>
             <h1 className="page-title">Orders</h1>
@@ -461,9 +420,7 @@ export default function OwnerOrdersPage() {
             <span className="last-updated">
               Updated {lastUpdated.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
             </span>
-            <button className="refresh-btn" onClick={fetchOrders}>
-              ↻ Refresh
-            </button>
+            <button className="refresh-btn" onClick={fetchOrders}>↻ Refresh</button>
           </div>
         </div>
 
@@ -489,9 +446,9 @@ export default function OwnerOrdersPage() {
           </div>
         )}
 
-        {/* Alert for pending orders */}
+        {/* Alert for new orders */}
         {pendingCount > 0 && (
-          <div className="new-orders-alert">
+          <div className="alert-banner">
             <span className="alert-dot" />
             {pendingCount} new order{pendingCount > 1 ? "s" : ""} waiting — tap &quot;Start Preparing&quot; to begin
           </div>
@@ -522,74 +479,64 @@ export default function OwnerOrdersPage() {
           </p>
         )}
 
-        {/* Orders list */}
         <div className="orders-list">
-          {filteredOrders.map((order) => {
-            const s = getStatusStyle(order.status);
-            return (
-              <div key={order.id} className={`order-card ${order.status}`}>
-
-                {/* Top row */}
-                <div className="order-top">
-                  <div>
-                    <div className="order-customer-row">
-                      <span className="order-customer">{order.customer_name}</span>
-                      <span
-                        className="status-badge"
-                        style={{ background: s.bg, color: s.color }}
-                      >
-                        {s.label}
-                      </span>
-                    </div>
-                    <p className="order-time">{formatTime(order.created_at)}</p>
+          {filteredOrders.map((order) => (
+            <div key={order.id} className={`order-card ${order.status}`}>
+              <div className="order-top">
+                <div>
+                  <div className="order-customer-row">
+                    <span className="order-customer">{order.customer_name}</span>
+                    <span className={`status-badge ${order.status}`}>
+                      {order.status === "pending" ? "New Order"
+                        : order.status === "preparing" ? "Preparing"
+                        : "Done"}
+                    </span>
                   </div>
-                  <div className="order-summary">
-                    <p className="order-total">${order.total.toFixed(2)}</p>
-                    <p className="order-payment-method">{order.payment_method}</p>
-                  </div>
+                  <p className="order-time">{formatTime(order.created_at)}</p>
                 </div>
-
-                {/* Items — always visible so owner knows what to make */}
-                <div className="order-items">
-                  {order.order_items.map((item) => (
-                    <div key={item.id} className="item-chip">
-                      <span className="item-qty">×{item.quantity}</span>
-                      <span>{item.menus?.name || "Unknown"}</span>
-                      {item.notes && (
-                        <span className="item-notes">— {item.notes}</span>
-                      )}
-                    </div>
-                  ))}
+                <div className="order-summary">
+                  <p className="order-total">${order.total.toFixed(2)}</p>
+                  <p className="order-payment-method">{order.payment_method}</p>
                 </div>
-
-                {/* Action buttons */}
-                <div className="order-actions">
-                  {order.status === "pending" && (
-                    <button
-                      className="action-btn start"
-                      disabled={updatingId === order.id}
-                      onClick={() => handleStatusUpdate(order.id, "preparing")}
-                    >
-                      {updatingId === order.id ? "Updating..." : "▶ Start Preparing"}
-                    </button>
-                  )}
-                  {order.status === "preparing" && (
-                    <button
-                      className="action-btn complete"
-                      disabled={updatingId === order.id}
-                      onClick={() => handleStatusUpdate(order.id, "completed")}
-                    >
-                      {updatingId === order.id ? "Updating..." : "✓ Mark as Completed"}
-                    </button>
-                  )}
-                  {order.status === "completed" && (
-                    <span className="action-btn done-label">✓ Completed & Paid</span>
-                  )}
-                </div>
-
               </div>
-            );
-          })}
+
+              {/* Items always visible */}
+              <div className="order-items">
+                {order.order_items.map((item) => (
+                  <div key={item.id} className="item-chip">
+                    <span className="item-qty">×{item.quantity}</span>
+                    <span>{item.menus?.name || "Unknown"}</span>
+                    {item.notes && <span className="item-notes">— {item.notes}</span>}
+                  </div>
+                ))}
+              </div>
+
+              {/* Action buttons */}
+              <div className="order-actions">
+                {order.status === "pending" && (
+                  <button
+                    className="action-btn prepare"
+                    disabled={updatingId === order.id}
+                    onClick={() => handleStatusUpdate(order.id, "preparing")}
+                  >
+                    {updatingId === order.id ? "Updating..." : "▶ Start Preparing"}
+                  </button>
+                )}
+                {order.status === "preparing" && (
+                  <button
+                    className="action-btn complete"
+                    disabled={updatingId === order.id}
+                    onClick={() => handleStatusUpdate(order.id, "completed")}
+                  >
+                    {updatingId === order.id ? "Updating..." : "✓ Mark as Completed"}
+                  </button>
+                )}
+                {order.status === "completed" && (
+                  <span className="action-btn done-label">✓ Completed & Paid</span>
+                )}
+              </div>
+            </div>
+          ))}
         </div>
       </div>
     </>

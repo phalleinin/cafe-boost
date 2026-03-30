@@ -19,6 +19,8 @@ export default function OwnerLoginPage() {
       setError(null);
 
       await supabase.auth.signOut();
+      localStorage.clear();
+      sessionStorage.clear();
 
       const { data, error } = await supabase.auth.signInWithPassword({
         email,

@@ -174,7 +174,7 @@ export default function ConfirmationPage() {
 
           <h1 className="confirm-title">Order Placed!</h1>
           <p className="confirm-sub">
-            Your order has been received. Our barista will prepare it shortly. Please wait at your table.
+            Your order has been received. Please wait.
           </p>
 
           <div className="divider" />
