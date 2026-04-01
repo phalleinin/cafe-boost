@@ -306,7 +306,7 @@ export default function OwnerAnalyticPage() {
         {/* Bottom panels */}
         <div className="bottom-grid">
           <div className="panel">
-            <h2 className="section-title">Popular Items</h2>
+            <h2 className="section-title">Popular Drink</h2>
             {data?.popularItems.length === 0 ? (
               <p className="empty-state">No order data yet</p>
             ) : (

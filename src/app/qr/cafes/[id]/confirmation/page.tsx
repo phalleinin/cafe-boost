@@ -182,20 +182,13 @@ export default function ConfirmationPage() {
           {/* Live status indicator */}
           <div className="status-row">
             <span className="status-dot" />
-            Your order is being prepared
+            Your order is being prepared. Thank you!!
           </div>
 
           {/* Back to menu */}
           <button
             onClick={() => router.push(`/qr/cafes/${cafeId}/menu`)}
             className="back-btn"
-          >
-            Order More
-          </button>
-
-          <button
-            onClick={() => router.push("/")}
-            className="secondary-btn"
           >
             Back to Menu
           </button>
