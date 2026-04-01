@@ -399,7 +399,7 @@ export default function HomePage() {
             </span>
             <div className="nav-links">
               {/* ✅ Added className to fix hover and color */}
-              <Link href="/auth/signin" className="nav-link">Owner Sign In</Link>
+              <Link href="/auth/signin" className="nav-link">Sign In</Link>
               <Link href="/auth/signup" className="nav-link primary">Get Started</Link>
             </div>
           </nav>
