@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState, useCallback, useRef } from "react";
+import { useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabase/client";
 
 type OrderItem = {
@@ -24,6 +25,7 @@ type Order = {
   order_items: OrderItem[];
 };
 
+// ✅ Never touches window — safe on server
 const guestName = (n: string | null) => n?.trim() || "Guest";
 const fmt = (d: string) =>
   new Date(d).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
@@ -37,20 +39,24 @@ const SELECT_QUERY = `
 `;
 
 export default function OwnerOrdersPage() {
-  const [cafeId, setCafeId]       = useState<string | null>(null);
-  const [orders, setOrders]       = useState<Order[]>([]);
-  const [loading, setLoading]     = useState(true);
-  const [error, setError]         = useState<string | null>(null);
-  const [updatingId, setUpdating] = useState<string | null>(null);
-  const [notifGranted, setNotif]  = useState(false);
-  const knownIds                  = useRef<Set<string>>(new Set());
+  const router = useRouter(); // ✅ use Next.js router instead of window.location
 
-  // auth + cafe_id
+  const [cafeId, setCafeId]             = useState<string | null>(null);
+  const [orders, setOrders]             = useState<Order[]>([]);
+  const [loading, setLoading]           = useState(true);
+  const [error, setError]               = useState<string | null>(null);
+  const [updatingId, setUpdating]       = useState<string | null>(null);
+  const [notifGranted, setNotifGranted] = useState(false);
+  const [showNotifBar, setShowNotifBar] = useState(false);
+  const knownIds                        = useRef<Set<string>>(new Set());
+
+  // ── auth + cafe_id ────────────────────────────────────────────────────────
   useEffect(() => {
     (async () => {
       try {
         const { data: { user } } = await supabase.auth.getUser();
-        if (!user) { window.location.href = "/auth/signin"; return; }
+        // ✅ router.push runs client-side only — safe
+        if (!user) { router.push("/auth/signin"); return; }
 
         const { data: profile, error: pe } = await supabase
           .from("profiles")
@@ -59,33 +65,46 @@ export default function OwnerOrdersPage() {
           .single();
 
         if (pe) throw pe;
-        if (!profile?.cafe_id) { window.location.href = "/auth/setup-cafe"; return; }
+        if (!profile?.cafe_id) { router.push("/auth/setup-cafe"); return; }
         setCafeId(profile.cafe_id);
-      } catch (e) {
+      } catch (e: unknown) {
         setError(e instanceof Error ? e.message : "Failed to load profile");
         setLoading(false);
       }
     })();
-  }, []);
+  }, [router]);
 
-  // notification permission
+  // ── notification permission — runs only in browser after mount ────────────
   useEffect(() => {
-    if ("Notification" in window) {
-      if (Notification.permission === "granted") setNotif(true);
-      else if (Notification.permission !== "denied")
-        Notification.requestPermission().then((p) => setNotif(p === "granted"));
+    // typeof check is SSR-safe — no direct window access
+    if (typeof window === "undefined") return;
+    if (!("Notification" in window)) return;
+
+    if (Notification.permission === "granted") {
+      setNotifGranted(true);
+    } else if (Notification.permission === "default") {
+      setShowNotifBar(true);
     }
   }, []);
 
+  // ✅ requestNotif only ever called on a button click — always browser
+  const requestNotif = () => {
+    if (typeof window === "undefined" || !("Notification" in window)) return;
+    Notification.requestPermission().then((p) => {
+      setNotifGranted(p === "granted");
+      setShowNotifBar(false);
+    });
+  };
+
   const pushNotif = useCallback((order: Order) => {
-    if (!notifGranted) return;
+    if (!notifGranted || typeof window === "undefined") return;
     new Notification("🆕 New Order!", {
       body: `${guestName(order.customer_name)} • $${order.total.toFixed(2)}`,
       icon: "/favicon.ico",
     });
   }, [notifGranted]);
 
-  // initial fetch
+  // ── initial fetch ─────────────────────────────────────────────────────────
   const fetchOrders = useCallback(async () => {
     if (!cafeId) return;
     try {
@@ -103,7 +122,7 @@ export default function OwnerOrdersPage() {
       valid.forEach((o) => knownIds.current.add(o.id));
       setOrders(valid);
       setError(null);
-    } catch (e) {
+    } catch (e: unknown) {
       setError(e instanceof Error ? e.message : "Error loading orders");
     } finally {
       setLoading(false);
@@ -112,7 +131,7 @@ export default function OwnerOrdersPage() {
 
   useEffect(() => { fetchOrders(); }, [fetchOrders]);
 
-  // real-time subscription
+  // ── real-time subscription ────────────────────────────────────────────────
   useEffect(() => {
     if (!cafeId) return;
 
@@ -123,13 +142,15 @@ export default function OwnerOrdersPage() {
         { event: "*", schema: "public", table: "orders", filter: `cafe_id=eq.${cafeId}` },
         async (payload) => {
           if (payload.eventType === "DELETE") {
-            setOrders((prev) => prev.filter((o) => o.id !== payload.old.id));
+            setOrders((prev) => prev.filter((o) => o.id !== (payload.old as { id: string }).id));
             return;
           }
+
+          const newRecord = payload.new as { id: string };
           const { data, error } = await supabase
             .from("orders")
             .select(SELECT_QUERY)
-            .eq("id", payload.new.id)
+            .eq("id", newRecord.id)
             .single();
 
           if (error || !data) return;
@@ -153,24 +174,31 @@ export default function OwnerOrdersPage() {
     return () => { supabase.removeChannel(channel); };
   }, [cafeId, pushNotif]);
 
+  // ── status update ─────────────────────────────────────────────────────────
   const updateStatus = async (orderId: string, status: OrderStatus) => {
     setUpdating(orderId);
     try {
-      const { error } = await supabase.from("orders").update({ status }).eq("id", orderId);
+      const { error } = await supabase
+        .from("orders")
+        .update({ status })
+        .eq("id", orderId);
       if (error) throw error;
       setOrders((prev) => prev.map((o) => (o.id === orderId ? { ...o, status } : o)));
-    } catch {
-      alert("Failed to update status.");
+    } catch (e: unknown) {
+      console.error("Status update failed:", e);
+      alert("Failed to update status. Please try again.");
     } finally {
       setUpdating(null);
     }
   };
 
+  // ── derived state ─────────────────────────────────────────────────────────
   const pending   = orders.filter((o) => o.status === "pending");
   const preparing = orders.filter((o) => o.status === "preparing");
   const completed = orders.filter((o) => o.status === "completed");
   const revenue   = completed.reduce((s, o) => s + o.total, 0);
 
+  // ─────────────────────────────────────────────────────────────────────────
   return (
     <>
       <style>{`
@@ -185,7 +213,6 @@ export default function OwnerOrdersPage() {
 
         *, *::before, *::after { box-sizing: border-box; }
 
-        /* ── header ── */
         .pos-header {
           display: flex;
           justify-content: space-between;
@@ -225,7 +252,6 @@ export default function OwnerOrdersPage() {
           50%      { opacity:0.7; box-shadow: 0 0 0 6px rgba(34,197,94,0); }
         }
 
-        /* ── kpi strip ── */
         .kpi-row {
           display: grid;
           grid-template-columns: repeat(4, 1fr);
@@ -261,7 +287,6 @@ export default function OwnerOrdersPage() {
           text-transform: uppercase;
         }
 
-        /* ── alerts ── */
         .new-alert {
           background: rgba(255,180,0,0.08);
           border: 1px solid rgba(255,180,0,0.35);
@@ -328,6 +353,8 @@ export default function OwnerOrdersPage() {
           width: 100%;
         }
 
+        .notif-btns { display: flex; gap: 8px; flex-shrink: 0; }
+
         .notif-allow {
           font-size: 12px; font-weight: 500;
           color: #2A6CB8; background: none;
@@ -336,7 +363,13 @@ export default function OwnerOrdersPage() {
           cursor: pointer; font-family: 'DM Sans', sans-serif;
         }
 
-        /* ── kanban ── */
+        .notif-dismiss {
+          font-size: 12px; color: rgba(26,15,0,0.3);
+          background: none; border: none;
+          padding: 4px 8px; cursor: pointer;
+          font-family: 'DM Sans', sans-serif;
+        }
+
         .kanban {
           display: grid;
           grid-template-columns: repeat(3, 1fr);
@@ -349,7 +382,6 @@ export default function OwnerOrdersPage() {
           .kanban { grid-template-columns: 1fr; }
         }
 
-        /* each column fills its grid cell */
         .col-wrap {
           width: 100%;
           min-height: 300px;
@@ -357,9 +389,9 @@ export default function OwnerOrdersPage() {
           padding: 16px;
         }
 
-        .col-pending   { background: rgba(255,180,0,0.05); border: 1px solid rgba(255,180,0,0.18); }
+        .col-pending   { background: rgba(255,180,0,0.05);  border: 1px solid rgba(255,180,0,0.18); }
         .col-preparing { background: rgba(58,124,200,0.05); border: 1px solid rgba(58,124,200,0.18); }
-        .col-done      { background: rgba(26,138,80,0.05); border: 1px solid rgba(26,138,80,0.18); }
+        .col-done      { background: rgba(26,138,80,0.05);  border: 1px solid rgba(26,138,80,0.18); }
 
         .col-head {
           display: flex;
@@ -382,16 +414,15 @@ export default function OwnerOrdersPage() {
         .col-done      .col-label { color: #1A8A50; }
 
         .col-count {
-          font-size: 11px;
-          font-weight: 700;
+          font-size: 11px; font-weight: 700;
           width: 22px; height: 22px;
           border-radius: 50%;
           display: flex; align-items: center; justify-content: center;
         }
 
-        .col-pending   .col-count { background: rgba(255,180,0,0.15); color: #B87800; }
+        .col-pending   .col-count { background: rgba(255,180,0,0.15);  color: #B87800; }
         .col-preparing .col-count { background: rgba(58,124,200,0.15); color: #2A6CB8; }
-        .col-done      .col-count { background: rgba(26,138,80,0.12); color: #1A8A50; }
+        .col-done      .col-count { background: rgba(26,138,80,0.12);  color: #1A8A50; }
 
         .col-empty {
           text-align: center;
@@ -400,7 +431,6 @@ export default function OwnerOrdersPage() {
           color: rgba(26,15,0,0.25);
         }
 
-        /* ── order card ── */
         .ocard {
           background: #ffffff;
           border-radius: 12px;
@@ -412,11 +442,7 @@ export default function OwnerOrdersPage() {
           width: 100%;
         }
 
-        .ocard:hover {
-          transform: translateY(-2px);
-          box-shadow: 0 5px 16px rgba(0,0,0,0.09);
-        }
-
+        .ocard:hover { transform: translateY(-2px); box-shadow: 0 5px 16px rgba(0,0,0,0.09); }
         .ocard:last-child { margin-bottom: 0; }
 
         .ocard.pending   { border-top: 3px solid #FFB400; }
@@ -432,70 +458,46 @@ export default function OwnerOrdersPage() {
         }
 
         .ocard-name {
-          font-size: 14px;
-          font-weight: 500;
-          color: #1A0F00;
-          margin-bottom: 2px;
+          font-size: 14px; font-weight: 500;
+          color: #1A0F00; margin-bottom: 2px;
         }
 
         .ocard-name.guest { color: rgba(26,15,0,0.45); font-style: italic; }
-
         .ocard-time { font-size: 11px; color: rgba(26,15,0,0.3); }
-
         .ocard-right { text-align: right; flex-shrink: 0; }
 
         .ocard-total {
           font-family: 'Cormorant Garamond', serif;
-          font-size: 20px;
-          font-weight: 600;
-          color: #C8873A;
-          line-height: 1;
+          font-size: 20px; font-weight: 600;
+          color: #C8873A; line-height: 1;
         }
 
         .ocard-pay {
-          font-size: 10px;
-          color: rgba(26,15,0,0.3);
-          text-transform: uppercase;
-          letter-spacing: 0.06em;
-          margin-top: 2px;
+          font-size: 10px; color: rgba(26,15,0,0.3);
+          text-transform: uppercase; letter-spacing: 0.06em; margin-top: 2px;
         }
 
         .ocard-items {
           padding: 0 14px 10px;
-          display: flex;
-          flex-direction: column;
-          gap: 4px;
+          display: flex; flex-direction: column; gap: 4px;
         }
 
         .item-row {
-          display: flex;
-          align-items: center;
-          gap: 7px;
-          font-size: 12px;
-          color: #1A0F00;
-          background: #F7F3EE;
-          border-radius: 7px;
-          padding: 5px 9px;
+          display: flex; align-items: center; gap: 7px;
+          font-size: 12px; color: #1A0F00;
+          background: #F7F3EE; border-radius: 7px; padding: 5px 9px;
         }
 
         .item-qty {
-          font-size: 10px;
-          font-weight: 700;
-          color: #C8873A;
-          background: rgba(200,135,58,0.12);
-          border-radius: 4px;
-          padding: 1px 5px;
-          flex-shrink: 0;
+          font-size: 10px; font-weight: 700; color: #C8873A;
+          background: rgba(200,135,58,0.12); border-radius: 4px;
+          padding: 1px 5px; flex-shrink: 0;
         }
 
         .item-note {
-          font-size: 10px;
-          color: rgba(26,15,0,0.4);
-          margin-left: auto;
-          white-space: nowrap;
-          overflow: hidden;
-          text-overflow: ellipsis;
-          max-width: 80px;
+          font-size: 10px; color: rgba(26,15,0,0.4);
+          margin-left: auto; white-space: nowrap;
+          overflow: hidden; text-overflow: ellipsis; max-width: 80px;
         }
 
         .ocard-actions {
@@ -504,54 +506,41 @@ export default function OwnerOrdersPage() {
         }
 
         .btn {
-          width: 100%;
-          padding: 9px 0;
-          border-radius: 100px;
-          font-size: 12px;
-          font-weight: 500;
-          font-family: 'DM Sans', sans-serif;
-          cursor: pointer;
-          transition: all 0.15s;
-          border: 1px solid;
-          text-align: center;
-          letter-spacing: 0.03em;
+          width: 100%; padding: 9px 0;
+          border-radius: 100px; font-size: 12px; font-weight: 500;
+          font-family: 'DM Sans', sans-serif; cursor: pointer;
+          transition: all 0.15s; border: 1px solid;
+          text-align: center; letter-spacing: 0.03em;
         }
 
         .btn:disabled { opacity: 0.4; cursor: not-allowed; }
 
         .btn-prepare {
-          background: rgba(255,180,0,0.1);
-          color: #B87800;
+          background: rgba(255,180,0,0.1); color: #B87800;
           border-color: rgba(255,180,0,0.4);
         }
         .btn-prepare:hover:not(:disabled) { background: rgba(255,180,0,0.2); }
 
         .btn-complete {
-          background: #1A8A50;
-          color: #ffffff;
+          background: #1A8A50; color: #ffffff;
           border-color: #1A8A50;
           box-shadow: 0 3px 8px rgba(26,138,80,0.25);
         }
         .btn-complete:hover:not(:disabled) { opacity: 0.88; }
 
         .btn-done {
-          background: rgba(26,138,80,0.08);
-          color: #1A8A50;
-          border-color: rgba(26,138,80,0.2);
-          cursor: default;
+          background: rgba(26,138,80,0.08); color: #1A8A50;
+          border-color: rgba(26,138,80,0.2); cursor: default;
         }
 
         .status-msg {
-          text-align: center;
-          padding: 48px 0;
-          font-size: 13px;
-          color: rgba(26,15,0,0.25);
+          text-align: center; padding: 48px 0;
+          font-size: 13px; color: rgba(26,15,0,0.25);
         }
       `}</style>
 
       <div className="pos-root">
 
-        {/* header */}
         <div className="pos-header">
           <div>
             <h1 className="pos-title">Orders</h1>
@@ -562,22 +551,17 @@ export default function OwnerOrdersPage() {
           </div>
         </div>
 
-        {/* notification nudge */}
-        {"Notification" in window && Notification.permission === "default" && !notifGranted && (
+        {/* ✅ Controlled by state — never touches window on server */}
+        {showNotifBar && (
           <div className="notif-bar">
             <span>Enable notifications to be alerted on new orders</span>
-            <button
-              className="notif-allow"
-              onClick={() =>
-                Notification.requestPermission().then((p) => setNotif(p === "granted"))
-              }
-            >
-              Allow
-            </button>
+            <div className="notif-btns">
+              <button className="notif-allow" onClick={requestNotif}>Allow</button>
+              <button className="notif-dismiss" onClick={() => setShowNotifBar(false)}>✕</button>
+            </div>
           </div>
         )}
 
-        {/* error */}
         {error && (
           <div className="err-bar">
             <span>⚠ {error}</span>
@@ -585,7 +569,6 @@ export default function OwnerOrdersPage() {
           </div>
         )}
 
-        {/* kpi strip */}
         {!loading && (
           <div className="kpi-row">
             <div className="kpi">
@@ -607,7 +590,6 @@ export default function OwnerOrdersPage() {
           </div>
         )}
 
-        {/* new order alert */}
         {pending.length > 0 && (
           <div className="new-alert">
             <span className="pulse-dot" />
@@ -617,7 +599,6 @@ export default function OwnerOrdersPage() {
 
         {loading && <p className="status-msg">Loading orders…</p>}
 
-        {/* kanban */}
         {!loading && (
           <div className="kanban">
 
