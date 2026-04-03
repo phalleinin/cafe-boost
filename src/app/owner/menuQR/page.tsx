@@ -3,8 +3,11 @@
 import { useEffect, useRef, useState } from "react";
 import { supabase } from "@/lib/supabase/client";
 import { QRCodeCanvas } from "qrcode.react";
+import { useLocale } from "@/i18n/locale-context";
 
 export default function MenuQRPage() {
+  const { t } = useLocale();
+
   const [cafeId, setCafeId] = useState<string | null>(null);
   const [cafeName, setCafeName] = useState<string>("");
   const [loading, setLoading] = useState(true);
@@ -14,9 +17,14 @@ export default function MenuQRPage() {
   useEffect(() => {
     const init = async () => {
       try {
-        const { data: { user } } = await supabase.auth.getUser();
+        const {
+          data: { user },
+        } = await supabase.auth.getUser();
 
-        if (!user) { window.location.href = "/auth/signin"; return; }
+        if (!user) {
+          window.location.href = "/auth/signin";
+          return;
+        }
 
         const { data: profile, error: profileError } = await supabase
           .from("profiles")
@@ -25,7 +33,11 @@ export default function MenuQRPage() {
           .single();
 
         if (profileError) throw profileError;
-        if (!profile?.cafe_id) { window.location.href = "/auth/setup-cafe"; return; }
+
+        if (!profile?.cafe_id) {
+          window.location.href = "/auth/setup-cafe";
+          return;
+        }
 
         const { data: cafe, error: cafeError } = await supabase
           .from("cafes")
@@ -38,22 +50,24 @@ export default function MenuQRPage() {
         setCafeId(profile.cafe_id);
         setCafeName(cafe?.name || "");
       } catch (err) {
-        setError(err instanceof Error ? err.message : "Failed to load café info");
+        setError(err instanceof Error ? err.message : t.menuQR.failedToLoadCafeInfo);
       } finally {
         setLoading(false);
       }
     };
 
-    init();
-  }, []);
+    void init();
+  }, [t.menuQR.failedToLoadCafeInfo]);
 
-  const menuUrl = cafeId
-    ? `${window.location.origin}/qr/cafes/${cafeId}/menu`
-    : "";
+  const menuUrl =
+    typeof window !== "undefined" && cafeId
+      ? `${window.location.origin}/qr/cafes/${cafeId}/menu`
+      : "";
 
   const handleDownload = () => {
     const canvas = qrRef.current?.querySelector("canvas");
     if (!canvas) return;
+
     const url = canvas.toDataURL("image/png");
     const link = document.createElement("a");
     link.href = url;
@@ -63,21 +77,35 @@ export default function MenuQRPage() {
 
   if (loading) {
     return (
-      <div style={{
-        display: "flex", alignItems: "center", justifyContent: "center", height: "60vh",
-        fontFamily: "'DM Sans', sans-serif", color: "rgba(26,15,0,0.35)"
-      }}>
-        Loading...
+      <div
+        style={{
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+          height: "60vh",
+          fontFamily: "'DM Sans', 'Noto Sans Khmer', sans-serif",
+          color: "rgba(26,15,0,0.35)",
+        }}
+      >
+        {t.menuQR.loading}
       </div>
     );
   }
 
   if (error) {
     return (
-      <div style={{
-        display: "flex", alignItems: "center", justifyContent: "center", height: "60vh",
-        fontFamily: "'DM Sans', sans-serif", color: "#C03030"
-      }}>
+      <div
+        style={{
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+          height: "60vh",
+          fontFamily: "'DM Sans', 'Noto Sans Khmer', sans-serif",
+          color: "#C03030",
+          textAlign: "center",
+          padding: "0 20px",
+        }}
+      >
         {error}
       </div>
     );
@@ -86,15 +114,19 @@ export default function MenuQRPage() {
   return (
     <>
       <style>{`
-        @import url('https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@300;600&family=DM+Sans:wght@300;400;500&display=swap');
+        @import url('https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@300;600&family=DM+Sans:wght@300;400;500&family=Noto+Sans+Khmer:wght@300;400;500;600;700&display=swap');
 
         .qr-root {
-          font-family: 'DM Sans', sans-serif;
+          font-family: 'DM Sans', 'Noto Sans Khmer', sans-serif;
           color: #1A0F00;
           display: flex;
           flex-direction: column;
           align-items: center;
           padding: 16px;
+        }
+
+        .khmer-text {
+          font-family: 'Noto Sans Khmer', 'DM Sans', sans-serif;
         }
 
         .qr-page-title {
@@ -173,7 +205,7 @@ export default function MenuQRPage() {
           border-radius: 100px;
           font-size: 13px;
           font-weight: 500;
-          font-family: 'DM Sans', sans-serif;
+          font-family: 'DM Sans', 'Noto Sans Khmer', sans-serif;
           border: none;
           cursor: pointer;
           transition: opacity 0.2s, transform 0.2s;
@@ -196,7 +228,7 @@ export default function MenuQRPage() {
           border-radius: 100px;
           font-size: 13px;
           font-weight: 500;
-          font-family: 'DM Sans', sans-serif;
+          font-family: 'DM Sans', 'Noto Sans Khmer', sans-serif;
           border: 1px solid rgba(200,135,58,0.2);
           cursor: pointer;
           transition: all 0.2s;
@@ -207,6 +239,12 @@ export default function MenuQRPage() {
           border-color: rgba(200,135,58,0.4);
           color: #C8873A;
           background: rgba(200,135,58,0.04);
+        }
+
+        .qr-btn-secondary:disabled,
+        .qr-btn-primary:disabled {
+          opacity: 0.5;
+          cursor: not-allowed;
         }
 
         .qr-hint {
@@ -220,9 +258,12 @@ export default function MenuQRPage() {
       `}</style>
 
       <div className="qr-root">
-        <h1 className="qr-page-title">Your Menu QR Code</h1>
-        <p className="qr-page-sub">
-          Print or display this QR code so customers can scan and order directly.
+        <h1 className={`qr-page-title ${t.meta.isKhmer ? "khmer-text" : ""}`}>
+          {t.menuQR.title}
+        </h1>
+
+        <p className={`qr-page-sub ${t.meta.isKhmer ? "khmer-text" : ""}`}>
+          {t.menuQR.subtitle}
         </p>
 
         <div className="qr-card">
@@ -237,24 +278,27 @@ export default function MenuQRPage() {
               />
             )}
           </div>
+
           <p className="qr-cafe-name">{cafeName}</p>
           <p className="qr-url">{menuUrl}</p>
         </div>
 
         <div className="qr-actions">
-          <button onClick={handleDownload} className="qr-btn-primary">
-            ↓ Download QR
+          <button onClick={handleDownload} className="qr-btn-primary" disabled={!menuUrl}>
+            ↓ {t.menuQR.downloadQr}
           </button>
+
           <button
             onClick={() => window.open(menuUrl, "_blank")}
             className="qr-btn-secondary"
+            disabled={!menuUrl}
           >
-            ↗ Preview Menu
+            ↗ {t.menuQR.previewMenu}
           </button>
         </div>
 
-        <p className="qr-hint">
-          Place this QR code on your tables, counter, or printed menus. Customers scan it to view your menu and place orders.
+        <p className={`qr-hint ${t.meta.isKhmer ? "khmer-text" : ""}`}>
+          {t.menuQR.hint}
         </p>
       </div>
     </>

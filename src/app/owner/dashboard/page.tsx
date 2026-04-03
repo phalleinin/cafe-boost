@@ -3,6 +3,7 @@
 import { useEffect, useState, useCallback, useRef } from "react";
 import { useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabase/client";
+import { useLocale } from "@/i18n/locale-context";
 
 type OrderItem = {
   id: string;
@@ -25,10 +26,6 @@ type Order = {
   order_items: OrderItem[];
 };
 
-const guestName = (n: string | null) => n?.trim() || "Guest";
-const fmt = (d: string) =>
-  new Date(d).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
-
 const SELECT_QUERY = `
   id, customer_name, status, payment_method, total, created_at,
   order_items!order_items_order_id_fkey (
@@ -37,24 +34,35 @@ const SELECT_QUERY = `
   )
 `;
 
-export default function OwnerOrdersPage() {
+export default function OwnerDashboardPage() {
   const router = useRouter();
+  const { t } = useLocale();
 
-  const [cafeId, setCafeId]             = useState<string | null>(null);
-  const [orders, setOrders]             = useState<Order[]>([]);
-  const [loading, setLoading]           = useState(true);
-  const [error, setError]               = useState<string | null>(null);
-  const [updatingId, setUpdating]       = useState<string | null>(null);
+  const [cafeId, setCafeId] = useState<string | null>(null);
+  const [orders, setOrders] = useState<Order[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [updatingId, setUpdating] = useState<string | null>(null);
   const [notifGranted, setNotifGranted] = useState(false);
   const [showNotifBar, setShowNotifBar] = useState(false);
-  const knownIds                        = useRef<Set<string>>(new Set());
+  const knownIds = useRef<Set<string>>(new Set());
 
-  // auth + cafe_id
+  const guestName = useCallback(
+    (n: string | null) => n?.trim() || t.dashboard.guestName,
+    [t.dashboard.guestName]
+  );
+
   useEffect(() => {
     (async () => {
       try {
-        const { data: { user } } = await supabase.auth.getUser();
-        if (!user) { router.push("/auth/signin"); return; }
+        const {
+          data: { user },
+        } = await supabase.auth.getUser();
+
+        if (!user) {
+          router.push("/auth/signin");
+          return;
+        }
 
         const { data: profile, error: pe } = await supabase
           .from("profiles")
@@ -63,19 +71,26 @@ export default function OwnerOrdersPage() {
           .single();
 
         if (pe) throw pe;
-        if (!profile?.cafe_id) { router.push("/auth/setup-cafe"); return; }
+
+        if (!profile?.cafe_id) {
+          router.push("/auth/setup-cafe");
+          return;
+        }
+
         setCafeId(profile.cafe_id);
       } catch (e: unknown) {
-        setError(e instanceof Error ? e.message : "Failed to load profile");
+        setError(
+          e instanceof Error ? e.message : t.dashboard.failedToLoadProfile
+        );
         setLoading(false);
       }
     })();
-  }, [router]);
+  }, [router, t.dashboard.failedToLoadProfile]);
 
-  // notification permission
   useEffect(() => {
     if (typeof window === "undefined") return;
     if (!("Notification" in window)) return;
+
     if (Notification.permission === "granted") {
       setNotifGranted(true);
     } else if (Notification.permission === "default") {
@@ -85,23 +100,28 @@ export default function OwnerOrdersPage() {
 
   const requestNotif = () => {
     if (typeof window === "undefined" || !("Notification" in window)) return;
+
     Notification.requestPermission().then((p) => {
       setNotifGranted(p === "granted");
       setShowNotifBar(false);
     });
   };
 
-  const pushNotif = useCallback((order: Order) => {
-    if (!notifGranted || typeof window === "undefined") return;
-    new Notification("🆕 New Order!", {
-      body: `${guestName(order.customer_name)} • $${order.total.toFixed(2)}`,
-      icon: "/favicon.ico",
-    });
-  }, [notifGranted]);
+  const pushNotif = useCallback(
+    (order: Order) => {
+      if (!notifGranted || typeof window === "undefined") return;
 
-  // initial fetch
+      new Notification(t.dashboard.newOrderNotificationTitle, {
+        body: `${guestName(order.customer_name)} • $${order.total.toFixed(2)}`,
+        icon: "/favicon.ico",
+      });
+    },
+    [notifGranted, guestName, t.dashboard.newOrderNotificationTitle]
+  );
+
   const fetchOrders = useCallback(async () => {
     if (!cafeId) return;
+
     try {
       const { data, error } = await supabase
         .from("orders")
@@ -114,19 +134,23 @@ export default function OwnerOrdersPage() {
       const valid = ((data as unknown as Order[]) ?? []).filter(
         (o) => Array.isArray(o.order_items) && o.order_items.length > 0
       );
+
       valid.forEach((o) => knownIds.current.add(o.id));
       setOrders(valid);
       setError(null);
     } catch (e: unknown) {
-      setError(e instanceof Error ? e.message : "Error loading orders");
+      setError(
+        e instanceof Error ? e.message : t.dashboard.errorLoadingOrders
+      );
     } finally {
       setLoading(false);
     }
-  }, [cafeId]);
+  }, [cafeId, t.dashboard.errorLoadingOrders]);
 
-  useEffect(() => { fetchOrders(); }, [fetchOrders]);
+  useEffect(() => {
+    void fetchOrders();
+  }, [fetchOrders]);
 
-  // real-time subscription
   useEffect(() => {
     if (!cafeId) return;
 
@@ -134,14 +158,22 @@ export default function OwnerOrdersPage() {
       .channel(`orders:${cafeId}`)
       .on(
         "postgres_changes",
-        { event: "*", schema: "public", table: "orders", filter: `cafe_id=eq.${cafeId}` },
+        {
+          event: "*",
+          schema: "public",
+          table: "orders",
+          filter: `cafe_id=eq.${cafeId}`,
+        },
         async (payload) => {
           if (payload.eventType === "DELETE") {
-            setOrders((prev) => prev.filter((o) => o.id !== (payload.old as { id: string }).id));
+            setOrders((prev) =>
+              prev.filter((o) => o.id !== (payload.old as { id: string }).id)
+            );
             return;
           }
 
           const newRecord = payload.new as { id: string };
+
           const { data, error } = await supabase
             .from("orders")
             .select(SELECT_QUERY)
@@ -149,8 +181,10 @@ export default function OwnerOrdersPage() {
             .single();
 
           if (error || !data) return;
+
           const order = data as unknown as Order;
-          if (!Array.isArray(order.order_items) || order.order_items.length === 0) return;
+          if (!Array.isArray(order.order_items) || order.order_items.length === 0)
+            return;
 
           if (payload.eventType === "INSERT" && !knownIds.current.has(order.id)) {
             knownIds.current.add(order.id);
@@ -166,43 +200,53 @@ export default function OwnerOrdersPage() {
       )
       .subscribe();
 
-    return () => { supabase.removeChannel(channel); };
+    return () => {
+      supabase.removeChannel(channel);
+    };
   }, [cafeId, pushNotif]);
 
-  // status update
   const updateStatus = async (orderId: string, status: OrderStatus) => {
     setUpdating(orderId);
+
     try {
       const { error } = await supabase
         .from("orders")
         .update({ status })
         .eq("id", orderId);
+
       if (error) throw error;
-      setOrders((prev) => prev.map((o) => (o.id === orderId ? { ...o, status } : o)));
+
+      setOrders((prev) =>
+        prev.map((o) => (o.id === orderId ? { ...o, status } : o))
+      );
     } catch (e: unknown) {
       console.error("Status update failed:", e);
-      alert("Failed to update status. Please try again.");
+      alert(t.dashboard.failedToUpdateStatus);
     } finally {
       setUpdating(null);
     }
   };
 
-  const pending   = orders.filter((o) => o.status === "pending");
+  const pending = orders.filter((o) => o.status === "pending");
   const preparing = orders.filter((o) => o.status === "preparing");
   const completed = orders.filter((o) => o.status === "completed");
 
   return (
     <>
       <style>{`
-        @import url('https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@400;600&family=DM+Sans:wght@300;400;500&display=swap');
+        @import url('https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@400;600&family=DM+Sans:wght@300;400;500&family=Noto+Sans+Khmer:wght@300;400;500;600;700&display=swap');
 
         *, *::before, *::after { box-sizing: border-box; }
 
         .pos-root {
-          font-family: 'DM Sans', sans-serif;
+          font-family: 'DM Sans', 'Noto Sans Khmer', sans-serif;
           color: #1A0F00;
           width: 100%;
           min-width: 0;
+        }
+
+        .khmer-text {
+          font-family: 'Noto Sans Khmer', 'DM Sans', sans-serif;
         }
 
         .pos-header {
@@ -241,10 +285,9 @@ export default function OwnerOrdersPage() {
 
         @keyframes livepulse {
           0%,100% { opacity:1; box-shadow: 0 0 0 0 rgba(34,197,94,0.5); }
-          50%      { opacity:0.7; box-shadow: 0 0 0 6px rgba(34,197,94,0); }
+          50% { opacity:0.7; box-shadow: 0 0 0 6px rgba(34,197,94,0); }
         }
 
-        /* ── alerts ── */
         .new-alert {
           background: rgba(255,180,0,0.08);
           border: 1px solid rgba(255,180,0,0.35);
@@ -270,7 +313,7 @@ export default function OwnerOrdersPage() {
 
         @keyframes pdot {
           0%,100% { transform:scale(1); opacity:1; }
-          50%      { transform:scale(0.6); opacity:0.3; }
+          50% { transform:scale(0.6); opacity:0.3; }
         }
 
         .err-bar {
@@ -289,11 +332,15 @@ export default function OwnerOrdersPage() {
         }
 
         .err-retry {
-          font-size: 12px; font-weight: 500;
-          color: #c0392b; background: none;
+          font-size: 12px;
+          font-weight: 500;
+          color: #c0392b;
+          background: none;
           border: 1px solid rgba(192,57,43,0.3);
-          border-radius: 100px; padding: 4px 12px;
-          cursor: pointer; font-family: 'DM Sans', sans-serif;
+          border-radius: 100px;
+          padding: 4px 12px;
+          cursor: pointer;
+          font-family: 'DM Sans', 'Noto Sans Khmer', sans-serif;
           flex-shrink: 0;
         }
 
@@ -316,27 +363,27 @@ export default function OwnerOrdersPage() {
         .notif-btns { display: flex; gap: 8px; flex-shrink: 0; }
 
         .notif-allow {
-          font-size: 12px; font-weight: 500;
-          color: #2A6CB8; background: none;
+          font-size: 12px;
+          font-weight: 500;
+          color: #2A6CB8;
+          background: none;
           border: 1px solid rgba(58,124,200,0.3);
-          border-radius: 100px; padding: 4px 12px;
-          cursor: pointer; font-family: 'DM Sans', sans-serif;
+          border-radius: 100px;
+          padding: 4px 12px;
+          cursor: pointer;
+          font-family: 'DM Sans', 'Noto Sans Khmer', sans-serif;
         }
 
         .notif-dismiss {
-          font-size: 12px; color: rgba(26,15,0,0.3);
-          background: none; border: none;
-          padding: 4px 8px; cursor: pointer;
-          font-family: 'DM Sans', sans-serif;
+          font-size: 12px;
+          color: rgba(26,15,0,0.3);
+          background: none;
+          border: none;
+          padding: 4px 8px;
+          cursor: pointer;
+          font-family: 'DM Sans', 'Noto Sans Khmer', sans-serif;
         }
 
-        /* ── kanban ──
-           ✅ Uses auto-fit with a minimum column width of 260px.
-           This means:
-           - Wide screen (sidebar closed): 3 columns side by side
-           - Medium screen (sidebar open): automatically drops to 2 or 1 column
-           - Never overflows or squeezes
-        */
         .kanban {
           display: grid;
           grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
@@ -378,10 +425,14 @@ export default function OwnerOrdersPage() {
         .col-done      .col-label { color: #1A8A50; }
 
         .col-count {
-          font-size: 11px; font-weight: 700;
-          width: 22px; height: 22px;
+          font-size: 11px;
+          font-weight: 700;
+          width: 22px;
+          height: 22px;
           border-radius: 50%;
-          display: flex; align-items: center; justify-content: center;
+          display: flex;
+          align-items: center;
+          justify-content: center;
           flex-shrink: 0;
         }
 
@@ -396,7 +447,6 @@ export default function OwnerOrdersPage() {
           color: rgba(26,15,0,0.25);
         }
 
-        /* ── order card ── */
         .ocard {
           background: #ffffff;
           border-radius: 12px;
@@ -428,8 +478,10 @@ export default function OwnerOrdersPage() {
         .ocard-left { min-width: 0; flex: 1; }
 
         .ocard-name {
-          font-size: 14px; font-weight: 500;
-          color: #1A0F00; margin-bottom: 2px;
+          font-size: 14px;
+          font-weight: 500;
+          color: #1A0F00;
+          margin-bottom: 2px;
           white-space: nowrap;
           overflow: hidden;
           text-overflow: ellipsis;
@@ -441,26 +493,38 @@ export default function OwnerOrdersPage() {
 
         .ocard-total {
           font-family: 'Cormorant Garamond', serif;
-          font-size: 20px; font-weight: 600;
-          color: #C8873A; line-height: 1;
+          font-size: 20px;
+          font-weight: 600;
+          color: #C8873A;
+          line-height: 1;
           white-space: nowrap;
         }
 
         .ocard-pay {
-          font-size: 10px; color: rgba(26,15,0,0.3);
-          text-transform: uppercase; letter-spacing: 0.06em; margin-top: 2px;
+          font-size: 10px;
+          color: rgba(26,15,0,0.3);
+          text-transform: uppercase;
+          letter-spacing: 0.06em;
+          margin-top: 2px;
           white-space: nowrap;
         }
 
         .ocard-items {
           padding: 0 14px 10px;
-          display: flex; flex-direction: column; gap: 4px;
+          display: flex;
+          flex-direction: column;
+          gap: 4px;
         }
 
         .item-row {
-          display: flex; align-items: center; gap: 7px;
-          font-size: 12px; color: #1A0F00;
-          background: #F7F3EE; border-radius: 7px; padding: 5px 9px;
+          display: flex;
+          align-items: center;
+          gap: 7px;
+          font-size: 12px;
+          color: #1A0F00;
+          background: #F7F3EE;
+          border-radius: 7px;
+          padding: 5px 9px;
           min-width: 0;
         }
 
@@ -473,13 +537,18 @@ export default function OwnerOrdersPage() {
         }
 
         .item-qty {
-          font-size: 10px; font-weight: 700; color: #C8873A;
-          background: rgba(200,135,58,0.12); border-radius: 4px;
-          padding: 1px 5px; flex-shrink: 0;
+          font-size: 10px;
+          font-weight: 700;
+          color: #C8873A;
+          background: rgba(200,135,58,0.12);
+          border-radius: 4px;
+          padding: 1px 5px;
+          flex-shrink: 0;
         }
 
         .item-note {
-          font-size: 10px; color: rgba(26,15,0,0.4);
+          font-size: 10px;
+          color: rgba(26,15,0,0.4);
           white-space: nowrap;
           overflow: hidden;
           text-overflow: ellipsis;
@@ -493,133 +562,195 @@ export default function OwnerOrdersPage() {
         }
 
         .btn {
-          width: 100%; padding: 9px 0;
-          border-radius: 100px; font-size: 12px; font-weight: 500;
-          font-family: 'DM Sans', sans-serif; cursor: pointer;
-          transition: all 0.15s; border: 1px solid;
-          text-align: center; letter-spacing: 0.03em;
+          width: 100%;
+          padding: 9px 0;
+          border-radius: 100px;
+          font-size: 12px;
+          font-weight: 500;
+          font-family: 'DM Sans', 'Noto Sans Khmer', sans-serif;
+          cursor: pointer;
+          transition: all 0.15s;
+          border: 1px solid;
+          text-align: center;
+          letter-spacing: 0.03em;
           white-space: nowrap;
         }
 
         .btn:disabled { opacity: 0.4; cursor: not-allowed; }
 
         .btn-prepare {
-          background: rgba(255,180,0,0.1); color: #B87800;
+          background: rgba(255,180,0,0.1);
+          color: #B87800;
           border-color: rgba(255,180,0,0.4);
         }
+
         .btn-prepare:hover:not(:disabled) { background: rgba(255,180,0,0.2); }
 
         .btn-complete {
-          background: #1A8A50; color: #ffffff;
+          background: #1A8A50;
+          color: #ffffff;
           border-color: #1A8A50;
           box-shadow: 0 3px 8px rgba(26,138,80,0.25);
         }
+
         .btn-complete:hover:not(:disabled) { opacity: 0.88; }
 
         .btn-done {
-          background: rgba(26,138,80,0.08); color: #1A8A50;
-          border-color: rgba(26,138,80,0.2); cursor: default;
+          background: rgba(26,138,80,0.08);
+          color: #1A8A50;
+          border-color: rgba(26,138,80,0.2);
+          cursor: default;
         }
 
         .status-msg {
-          text-align: center; padding: 48px 0;
-          font-size: 13px; color: rgba(26,15,0,0.25);
+          text-align: center;
+          padding: 48px 0;
+          font-size: 13px;
+          color: rgba(26,15,0,0.25);
         }
       `}</style>
 
       <div className="pos-root">
-
         <div className="pos-header">
           <div>
-            <h1 className="pos-title">Orders</h1>
-            <p className="pos-sub">
+            <h1 className={`pos-title ${t.meta.isKhmer ? "khmer-text" : ""}`}>
+              {t.dashboard.title}
+            </h1>
+            <p className={`pos-sub ${t.meta.isKhmer ? "khmer-text" : ""}`}>
               <span className="live-dot" />
-              Live · updates instantly
+              {t.dashboard.liveUpdates}
             </p>
           </div>
         </div>
 
         {showNotifBar && (
-          <div className="notif-bar">
-            <span>Enable notifications to be alerted on new orders</span>
+          <div className={`notif-bar ${t.meta.isKhmer ? "khmer-text" : ""}`}>
+            <span>{t.dashboard.notifications.enablePrompt}</span>
             <div className="notif-btns">
-              <button className="notif-allow" onClick={requestNotif}>Allow</button>
-              <button className="notif-dismiss" onClick={() => setShowNotifBar(false)}>✕</button>
+              <button className="notif-allow" onClick={requestNotif}>
+                {t.dashboard.notifications.allow}
+              </button>
+              <button
+                className="notif-dismiss"
+                onClick={() => setShowNotifBar(false)}
+              >
+                ✕
+              </button>
             </div>
           </div>
         )}
 
         {error && (
-          <div className="err-bar">
+          <div className={`err-bar ${t.meta.isKhmer ? "khmer-text" : ""}`}>
             <span>⚠ {error}</span>
-            <button className="err-retry" onClick={fetchOrders}>Retry</button>
+            <button className="err-retry" onClick={() => void fetchOrders()}>
+              {t.dashboard.retry}
+            </button>
           </div>
         )}
 
         {pending.length > 0 && (
-          <div className="new-alert">
+          <div className={`new-alert ${t.meta.isKhmer ? "khmer-text" : ""}`}>
             <span className="pulse-dot" />
-            {pending.length} new order{pending.length > 1 ? "s" : ""} waiting — tap Start Preparing
+            {t.dashboard.pendingAlert(pending.length)}
           </div>
         )}
 
-        {loading && <p className="status-msg">Loading orders…</p>}
+        {loading && (
+          <p className={`status-msg ${t.meta.isKhmer ? "khmer-text" : ""}`}>
+            {t.dashboard.loadingOrders}
+          </p>
+        )}
 
         {!loading && (
           <div className="kanban">
-
             <div className="col-wrap col-pending">
               <div className="col-head">
-                <span className="col-label">New Orders</span>
+                <span className={`col-label ${t.meta.isKhmer ? "khmer-text" : ""}`}>
+                  {t.dashboard.columns.newOrders}
+                </span>
                 <span className="col-count">{pending.length}</span>
               </div>
-              {pending.length === 0
-                ? <p className="col-empty">No new orders</p>
-                : pending.map((o) => (
-                    <OrderCard key={o.id} order={o}
-                      updating={updatingId === o.id}
-                      onAction={() => updateStatus(o.id, "preparing")}
-                      actionLabel="▶ Start Preparing"
-                      actionClass="btn-prepare" />
-                  ))
-              }
+
+              {pending.length === 0 ? (
+                <p className={`col-empty ${t.meta.isKhmer ? "khmer-text" : ""}`}>
+                  {t.dashboard.empty.newOrders}
+                </p>
+              ) : (
+                pending.map((o) => (
+                  <OrderCard
+                    key={o.id}
+                    order={o}
+                    updating={updatingId === o.id}
+                    onAction={() => updateStatus(o.id, "preparing")}
+                    actionLabel={t.dashboard.actions.startPreparing}
+                    actionClass="btn-prepare"
+                    guestName={guestName}
+                    unknownItem={t.dashboard.unknownItem}
+                    updatingText={t.dashboard.updating}
+                  />
+                ))
+              )}
             </div>
 
             <div className="col-wrap col-preparing">
               <div className="col-head">
-                <span className="col-label">Preparing</span>
+                <span className={`col-label ${t.meta.isKhmer ? "khmer-text" : ""}`}>
+                  {t.dashboard.columns.preparing}
+                </span>
                 <span className="col-count">{preparing.length}</span>
               </div>
-              {preparing.length === 0
-                ? <p className="col-empty">Nothing in progress</p>
-                : preparing.map((o) => (
-                    <OrderCard key={o.id} order={o}
-                      updating={updatingId === o.id}
-                      onAction={() => updateStatus(o.id, "completed")}
-                      actionLabel="✓ Mark Complete"
-                      actionClass="btn-complete" />
-                  ))
-              }
+
+              {preparing.length === 0 ? (
+                <p className={`col-empty ${t.meta.isKhmer ? "khmer-text" : ""}`}>
+                  {t.dashboard.empty.preparing}
+                </p>
+              ) : (
+                preparing.map((o) => (
+                  <OrderCard
+                    key={o.id}
+                    order={o}
+                    updating={updatingId === o.id}
+                    onAction={() => updateStatus(o.id, "completed")}
+                    actionLabel={t.dashboard.actions.markComplete}
+                    actionClass="btn-complete"
+                    guestName={guestName}
+                    unknownItem={t.dashboard.unknownItem}
+                    updatingText={t.dashboard.updating}
+                  />
+                ))
+              )}
             </div>
 
             <div className="col-wrap col-done">
               <div className="col-head">
-                <span className="col-label">Completed</span>
+                <span className={`col-label ${t.meta.isKhmer ? "khmer-text" : ""}`}>
+                  {t.dashboard.columns.completed}
+                </span>
                 <span className="col-count">{completed.length}</span>
               </div>
-              {completed.length === 0
-                ? <p className="col-empty">No completed orders yet</p>
-                : completed.map((o) => (
-                    <OrderCard key={o.id} order={o}
-                      updating={false}
-                      onAction={() => {}}
-                      actionLabel="✓ Completed & Paid"
-                      actionClass="btn-done"
-                      isDone />
-                  ))
-              }
-            </div>
 
+              {completed.length === 0 ? (
+                <p className={`col-empty ${t.meta.isKhmer ? "khmer-text" : ""}`}>
+                  {t.dashboard.empty.completed}
+                </p>
+              ) : (
+                completed.map((o) => (
+                  <OrderCard
+                    key={o.id}
+                    order={o}
+                    updating={false}
+                    onAction={() => {}}
+                    actionLabel={t.dashboard.actions.completedPaid}
+                    actionClass="btn-done"
+                    isDone
+                    guestName={guestName}
+                    unknownItem={t.dashboard.unknownItem}
+                    updatingText={t.dashboard.updating}
+                  />
+                ))
+              )}
+            </div>
           </div>
         )}
       </div>
@@ -628,7 +759,15 @@ export default function OwnerOrdersPage() {
 }
 
 function OrderCard({
-  order, updating, onAction, actionLabel, actionClass, isDone = false,
+  order,
+  updating,
+  onAction,
+  actionLabel,
+  actionClass,
+  isDone = false,
+  guestName,
+  unknownItem,
+  updatingText,
 }: {
   order: Order;
   updating: boolean;
@@ -636,8 +775,15 @@ function OrderCard({
   actionLabel: string;
   actionClass: string;
   isDone?: boolean;
+  guestName: (name: string | null) => string;
+  unknownItem: string;
+  updatingText: string;
 }) {
   const isGuest = !order.customer_name?.trim();
+
+  const fmt = (d: string) =>
+    new Date(d).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
+
   return (
     <div className={`ocard ${order.status}`}>
       <div className="ocard-top">
@@ -647,6 +793,7 @@ function OrderCard({
           </p>
           <p className="ocard-time">{fmt(order.created_at)}</p>
         </div>
+
         <div className="ocard-right">
           <p className="ocard-total">${order.total.toFixed(2)}</p>
           <p className="ocard-pay">{order.payment_method}</p>
@@ -657,7 +804,7 @@ function OrderCard({
         {order.order_items.map((item) => (
           <div key={item.id} className="item-row">
             <span className="item-qty">×{item.quantity}</span>
-            <span className="item-name">{item.menus?.name || "Unknown item"}</span>
+            <span className="item-name">{item.menus?.name || unknownItem}</span>
             {item.notes && <span className="item-note">{item.notes}</span>}
           </div>
         ))}
@@ -669,7 +816,7 @@ function OrderCard({
           disabled={updating || isDone}
           onClick={onAction}
         >
-          {updating ? "Updating…" : actionLabel}
+          {updating ? updatingText : actionLabel}
         </button>
       </div>
     </div>

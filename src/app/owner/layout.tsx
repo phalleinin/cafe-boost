@@ -1,12 +1,22 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { usePathname } from "next/navigation";
 import Link from "next/link";
 import { supabase } from "@/lib/supabase/client";
+import { LocaleProvider, useLocale } from "@/i18n/locale-context";
+import LanguageSwitcher from "@/app/components/owner/LanguageSwitcher";
 
-export default function OwnerLayout({ children }: { children: React.ReactNode }) {
+type ProfileRow = {
+  cafe_id: string | null;
+  name: string | null;
+  language?: "en" | "km" | null;
+};
+
+function OwnerLayoutInner({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
+  const { t, ready } = useLocale();
+
   const [cafeName, setCafeName] = useState("");
   const [ownerName, setOwnerName] = useState("");
   const [collapsed, setCollapsed] = useState(false);
@@ -14,47 +24,90 @@ export default function OwnerLayout({ children }: { children: React.ReactNode })
 
   useEffect(() => {
     const init = async () => {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) return;
+      try {
+        const {
+          data: { user },
+        } = await supabase.auth.getUser();
 
-      const { data: profile } = await supabase
-        .from("profiles")
-        .select("cafe_id, name")
-        .eq("id", user.id)
-        .single();
+        if (!user) {
+          window.location.href = "/owner/login";
+          return;
+        }
 
-      if (!profile?.cafe_id) return;
-      setOwnerName(profile.name || "");
+        const { data: profile } = await supabase
+          .from("profiles")
+          .select("cafe_id, name, language")
+          .eq("id", user.id)
+          .single<ProfileRow>();
 
-      const { data: cafe } = await supabase
-        .from("cafes")
-        .select("name")
-        .eq("id", profile.cafe_id)
-        .single();
+        if (!profile) {
+          setMounted(true);
+          return;
+        }
 
-      setCafeName(cafe?.name || "");
-      setMounted(true); // ✅ set mounted after data is ready
+        setOwnerName(profile.name || "");
+
+        if (profile.cafe_id) {
+          const { data: cafe } = await supabase
+            .from("cafes")
+            .select("name")
+            .eq("id", profile.cafe_id)
+            .single();
+
+          setCafeName(cafe?.name || "");
+        }
+
+        setMounted(true);
+      } catch (error) {
+        console.error("Failed to initialize owner layout:", error);
+        setMounted(true);
+      }
     };
 
-    init();
+    void init();
   }, []);
 
-  const navItems = [
-    { href: "/owner/dashboard", icon: "◎", label: "Orders" },
-    { href: "/owner/analytics", icon: "◉", label: "Analytics" },
-    { href: "/owner/menu", icon: "◈", label: "Menu" },
-    { href: "/owner/menuQR", icon: "▣", label: "QR Code" },
-  ];
+  const navItems = useMemo(
+    () => [
+      { href: "/owner/dashboard", icon: "◎", label: t.nav.orders },
+      { href: "/owner/analytics", icon: "◉", label: t.nav.analytics },
+      { href: "/owner/menu", icon: "◈", label: t.nav.menu },
+      { href: "/owner/menuQR", icon: "▣", label: t.nav.qrCode },
+    ],
+    [t]
+  );
 
   const handleSignOut = async () => {
     await supabase.auth.signOut();
     window.location.href = "/";
   };
 
+  const currentPageTitle = mounted
+    ? navItems.find((n) => n.href === pathname)?.label || t.common.dashboard
+    : "";
+
+  if (!ready) {
+    return (
+      <div
+        style={{
+          minHeight: "100vh",
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+          background: "#F7F3EE",
+          color: "#1A0F00",
+          fontFamily: "DM Sans, sans-serif",
+        }}
+      >
+        {t.common.loading}
+      </div>
+    );
+  }
+
   return (
     <>
       <style>{`
-        @import url('https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,300;0,400;0,600;0,700;1,300;1,600&family=DM+Sans:wght@300;400;500&display=swap');
+        @import url('https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,300;0,400;0,600;0,700;1,300;1,600&family=DM+Sans:wght@300;400;500&family=Noto+Sans+Khmer:wght@300;400;500;600;700&display=swap');
 
         * { box-sizing: border-box; margin: 0; padding: 0; }
 
@@ -62,13 +115,16 @@ export default function OwnerLayout({ children }: { children: React.ReactNode })
           display: flex;
           min-height: 100vh;
           background: #F7F3EE;
-          font-family: 'DM Sans', sans-serif;
+          font-family: 'DM Sans', 'Noto Sans Khmer', sans-serif;
           color: #1A0F00;
         }
 
-        /* SIDEBAR */
+        .khmer-text {
+          font-family: 'Noto Sans Khmer', 'DM Sans', sans-serif;
+        }
+
         .sidebar {
-          width: ${collapsed ? "72px" : "220px"};
+          width: ${collapsed ? "72px" : "260px"};
           min-height: 100vh;
           background: #ffffff;
           border-right: 1px solid rgba(200,135,58,0.2);
@@ -183,6 +239,10 @@ export default function OwnerLayout({ children }: { children: React.ReactNode })
           border-top: 1px solid rgba(200,135,58,0.15);
         }
 
+        .language-wrap {
+          padding: 0 4px 12px;
+        }
+
         .owner-chip {
           display: flex;
           align-items: center;
@@ -230,7 +290,7 @@ export default function OwnerLayout({ children }: { children: React.ReactNode })
           cursor: pointer;
           color: rgba(26,15,0,0.3);
           font-size: 13px;
-          font-family: 'DM Sans', sans-serif;
+          font-family: 'DM Sans', 'Noto Sans Khmer', sans-serif;
           transition: all 0.2s;
           text-align: left;
           white-space: nowrap;
@@ -247,7 +307,6 @@ export default function OwnerLayout({ children }: { children: React.ReactNode })
           transition: opacity 0.2s;
         }
 
-        /* MAIN */
         .main-area {
           flex: 1;
           display: flex;
@@ -306,17 +365,17 @@ export default function OwnerLayout({ children }: { children: React.ReactNode })
       `}</style>
 
       <div className="owner-shell">
-        {/* Sidebar */}
         <aside className="sidebar">
           <div className="sidebar-top">
             <span className="sidebar-logo">
               <span className="logo-dot" />
               CafeBoost
             </span>
+
             <button
               className="collapse-btn"
               onClick={() => setCollapsed(!collapsed)}
-              aria-label="Toggle sidebar"
+              aria-label={t.ownerLayout.toggleSidebar}
             >
               {collapsed ? "→" : "←"}
             </button>
@@ -327,7 +386,9 @@ export default function OwnerLayout({ children }: { children: React.ReactNode })
               <Link
                 key={item.href}
                 href={item.href}
-                className={`nav-item ${mounted && pathname === item.href ? "active" : ""}`}
+                className={`nav-item ${mounted && pathname === item.href ? "active" : ""} ${
+                  t.meta.isKhmer ? "khmer-text" : ""
+                }`}
               >
                 <span className="nav-icon">{item.icon}</span>
                 <span className="nav-label">{item.label}</span>
@@ -336,32 +397,57 @@ export default function OwnerLayout({ children }: { children: React.ReactNode })
           </nav>
 
           <div className="sidebar-bottom">
+            {!collapsed && (
+              <div className="language-wrap">
+                <LanguageSwitcher />
+              </div>
+            )}
+
             <div className="owner-chip">
               <div className="owner-avatar">
                 {ownerName?.charAt(0)?.toUpperCase() || "O"}
               </div>
-              <span className="owner-name">{ownerName || "Owner"}</span>
+              <span className={`owner-name ${t.meta.isKhmer ? "khmer-text" : ""}`}>
+                {ownerName || t.common.owner}
+              </span>
             </div>
+
             <button className="signout-btn" onClick={handleSignOut}>
               <span className="nav-icon">⊗</span>
-              <span className="signout-label">Sign Out</span>
+              <span className={`signout-label ${t.meta.isKhmer ? "khmer-text" : ""}`}>
+                {t.common.signOut}
+              </span>
             </button>
           </div>
         </aside>
 
-        {/* Main area */}
         <div className="main-area">
           <header className="top-bar">
-            <span className="page-title">
-              {mounted ? (navItems.find((n) => n.href === pathname)?.label || "Dashboard") : ""}
+            <span className={`page-title ${t.meta.isKhmer ? "khmer-text" : ""}`}>
+              {currentPageTitle}
             </span>
+
             <div className="top-bar-right">
+              {collapsed && <LanguageSwitcher />}
               <span className="cafe-badge">{cafeName}</span>
             </div>
           </header>
+
           <main className="page-content">{children}</main>
         </div>
       </div>
     </>
+  );
+}
+
+export default function OwnerLayout({
+  children,
+}: {
+  children: React.ReactNode;
+}) {
+  return (
+    <LocaleProvider>
+      <OwnerLayoutInner>{children}</OwnerLayoutInner>
+    </LocaleProvider>
   );
 }

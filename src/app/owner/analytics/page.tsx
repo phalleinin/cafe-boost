@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { supabase } from "@/lib/supabase/client";
+import { useLocale } from "@/i18n/locale-context";
 
 type AnalyticsSummary = {
   totalOrders: number;
@@ -19,26 +20,49 @@ type AnalyticsSummary = {
 };
 
 export default function OwnerAnalyticPage() {
+  const { t } = useLocale();
+
   const [cafeId, setCafeId] = useState<string | null>(null);
   const [data, setData] = useState<AnalyticsSummary | null>(null);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     const init = async () => {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) { window.location.href = "/auth/signin"; return; }
+      try {
+        const {
+          data: { user },
+        } = await supabase.auth.getUser();
 
-      const { data: profile } = await supabase
-        .from("profiles")
-        .select("cafe_id")
-        .eq("id", user.id)
-        .single();
+        if (!user) {
+          window.location.href = "/auth/signin";
+          return;
+        }
 
-      if (!profile?.cafe_id) { window.location.href = "/auth/setup-cafe"; return; }
-      setCafeId(profile.cafe_id);
+        const { data: profile, error: profileError } = await supabase
+          .from("profiles")
+          .select("cafe_id")
+          .eq("id", user.id)
+          .single();
+
+        if (profileError) throw profileError;
+
+        if (!profile?.cafe_id) {
+          window.location.href = "/auth/setup-cafe";
+          return;
+        }
+
+        setCafeId(profile.cafe_id);
+      } catch (err) {
+        setError(
+          err instanceof Error ? err.message : t.analytics.failedToLoadProfile
+        );
+        setLoading(false);
+      }
     };
-    init();
-  }, []);
+
+    void init();
+  }, [t.analytics.failedToLoadProfile]);
 
   useEffect(() => {
     if (!cafeId) return;
@@ -46,26 +70,36 @@ export default function OwnerAnalyticPage() {
     const fetchAnalytics = async () => {
       try {
         setLoading(true);
+        setError(null);
 
         const today = new Date();
         today.setHours(0, 0, 0, 0);
 
-        const { data: orders } = await supabase
+        const { data: orders, error: ordersError } = await supabase
           .from("orders")
           .select("id, customer_name, total, status, created_at")
           .eq("cafe_id", cafeId)
           .order("created_at", { ascending: false });
 
-        const { data: orderItems } = await supabase
+        if (ordersError) throw ordersError;
+
+        const orderIds = (orders || []).map((o) => o.id);
+
+        const { data: orderItems, error: orderItemsError } = await supabase
           .from("order_items")
           .select("quantity, menus(name)")
-          .in("order_id", (orders || []).map((o) => o.id));
+          .in("order_id", orderIds);
+
+        if (orderItemsError) throw orderItemsError;
 
         const itemMap: Record<string, number> = {};
-        (orderItems || []).forEach((oi: { quantity: number; menus: { name: string }[] | null }) => {
-          const name = oi.menus?.[0]?.name || "Unknown";
-          itemMap[name] = (itemMap[name] || 0) + oi.quantity;
-        });
+
+        (orderItems || []).forEach(
+          (oi: { quantity: number; menus: { name: string }[] | null }) => {
+            const name = oi.menus?.[0]?.name || t.analytics.unknownItem;
+            itemMap[name] = (itemMap[name] || 0) + oi.quantity;
+          }
+        );
 
         const popularItems = Object.entries(itemMap)
           .map(([name, count]) => ({ name, count }))
@@ -85,28 +119,64 @@ export default function OwnerAnalyticPage() {
           popularItems,
           recentOrders: allOrders.slice(0, 5),
         });
+      } catch (err) {
+        setError(
+          err instanceof Error ? err.message : t.analytics.failedToLoadAnalytics
+        );
       } finally {
         setLoading(false);
       }
     };
 
-    fetchAnalytics();
-  }, [cafeId]);
+    void fetchAnalytics();
+  }, [cafeId, t.analytics.failedToLoadAnalytics, t.analytics.unknownItem]);
 
   const getStatusColor = (status: string) => {
     switch (status) {
-      case "pending": return { bg: "rgba(255,180,0,0.12)", color: "#B87800" };
-      case "preparing": return { bg: "rgba(58,124,200,0.1)", color: "#2A6CB8" };
-      case "completed": return { bg: "rgba(40,160,90,0.1)", color: "#1A8A50" };
-      default: return { bg: "rgba(0,0,0,0.05)", color: "#888" };
+      case "pending":
+        return {
+          bg: "rgba(255,180,0,0.12)",
+          color: "#B87800",
+          label: t.orders.status.pending,
+        };
+      case "preparing":
+        return {
+          bg: "rgba(58,124,200,0.1)",
+          color: "#2A6CB8",
+          label: t.orders.status.preparing,
+        };
+      case "completed":
+        return {
+          bg: "rgba(40,160,90,0.1)",
+          color: "#1A8A50",
+          label: t.orders.status.completed,
+        };
+      default:
+        return {
+          bg: "rgba(0,0,0,0.05)",
+          color: "#888",
+          label: status,
+        };
     }
   };
 
   if (loading) {
     return (
-      <div style={{ display: "flex", alignItems: "center", justifyContent: "center", height: "60vh" }}>
-        <p style={{ color: "rgba(26,15,0,0.35)", fontFamily: "'DM Sans', sans-serif" }}>
-          Loading analytics...
+      <div
+        style={{
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+          height: "60vh",
+        }}
+      >
+        <p
+          style={{
+            color: "rgba(26,15,0,0.35)",
+            fontFamily: "'DM Sans', 'Noto Sans Khmer', sans-serif",
+          }}
+        >
+          {t.analytics.loading}
         </p>
       </div>
     );
@@ -115,9 +185,23 @@ export default function OwnerAnalyticPage() {
   return (
     <>
       <style>{`
-        @import url('https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,300;0,600;1,600&family=DM+Sans:wght@300;400;500&display=swap');
+        @import url('https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,300;0,600;1,600&family=DM+Sans:wght@300;400;500&family=Noto+Sans+Khmer:wght@300;400;500;600;700&display=swap');
 
-        .dash { font-family: 'DM Sans', sans-serif; color: #1A0F00; }
+        .dash {
+          font-family: 'DM Sans', 'Noto Sans Khmer', sans-serif;
+          color: #1A0F00;
+        }
+
+        .khmer-text {
+          font-family: 'Noto Sans Khmer', 'DM Sans', sans-serif;
+        }
+
+        .error-msg {
+          text-align: center;
+          padding: 0 0 24px;
+          font-size: 13px;
+          color: #b42318;
+        }
 
         .kpi-grid {
           display: grid;
@@ -275,43 +359,72 @@ export default function OwnerAnalyticPage() {
       `}</style>
 
       <div className="dash">
-        {/* KPI Cards — removed totalViews card */}
+        {error && (
+          <p className={`error-msg ${t.meta.isKhmer ? "khmer-text" : ""}`}>
+            {error}
+          </p>
+        )}
+
         <div className="kpi-grid">
           <div className="kpi-card">
-            <p className="kpi-label">Total Orders</p>
+            <p className={`kpi-label ${t.meta.isKhmer ? "khmer-text" : ""}`}>
+              {t.analytics.kpi.totalOrders}
+            </p>
             <p className="kpi-value">{data?.totalOrders ?? 0}</p>
-            <p className="kpi-sub">All time</p>
+            <p className={`kpi-sub ${t.meta.isKhmer ? "khmer-text" : ""}`}>
+              {t.analytics.kpi.allTime}
+            </p>
           </div>
+
           <div className="kpi-card">
-            <p className="kpi-label">Total Revenue</p>
+            <p className={`kpi-label ${t.meta.isKhmer ? "khmer-text" : ""}`}>
+              {t.analytics.kpi.totalRevenue}
+            </p>
             <p className="kpi-value kpi-accent">
               ${data?.totalRevenue.toFixed(2) ?? "0.00"}
             </p>
-            <p className="kpi-sub">All time</p>
+            <p className={`kpi-sub ${t.meta.isKhmer ? "khmer-text" : ""}`}>
+              {t.analytics.kpi.allTime}
+            </p>
           </div>
+
           <div className="kpi-card">
-            <p className="kpi-label">Today&apos;s Orders</p>
+            <p className={`kpi-label ${t.meta.isKhmer ? "khmer-text" : ""}`}>
+              {t.analytics.kpi.todayOrders}
+            </p>
             <p className="kpi-value">{data?.todayOrders ?? 0}</p>
-            <p className="kpi-sub">Since midnight</p>
+            <p className={`kpi-sub ${t.meta.isKhmer ? "khmer-text" : ""}`}>
+              {t.analytics.kpi.sinceMidnight}
+            </p>
           </div>
+
           <div className="kpi-card">
-            <p className="kpi-label">Today&apos;s Revenue</p>
+            <p className={`kpi-label ${t.meta.isKhmer ? "khmer-text" : ""}`}>
+              {t.analytics.kpi.todayRevenue}
+            </p>
             <p className="kpi-value kpi-accent">
               ${data?.todayRevenue.toFixed(2) ?? "0.00"}
             </p>
-            <p className="kpi-sub">Since midnight</p>
+            <p className={`kpi-sub ${t.meta.isKhmer ? "khmer-text" : ""}`}>
+              {t.analytics.kpi.sinceMidnight}
+            </p>
           </div>
         </div>
 
-        {/* Bottom panels */}
         <div className="bottom-grid">
           <div className="panel">
-            <h2 className="section-title">Popular Drink</h2>
+            <h2 className={`section-title ${t.meta.isKhmer ? "khmer-text" : ""}`}>
+              {t.analytics.sections.popularDrink}
+            </h2>
+
             {data?.popularItems.length === 0 ? (
-              <p className="empty-state">No order data yet</p>
+              <p className={`empty-state ${t.meta.isKhmer ? "khmer-text" : ""}`}>
+                {t.analytics.empty.noOrderData}
+              </p>
             ) : (
               data?.popularItems.map((item, i) => {
                 const max = data.popularItems[0]?.count || 1;
+
                 return (
                   <div key={i} className="popular-item">
                     <span className="popular-name">{item.name}</span>
@@ -329,21 +442,27 @@ export default function OwnerAnalyticPage() {
           </div>
 
           <div className="panel">
-            <h2 className="section-title">Recent Orders</h2>
+            <h2 className={`section-title ${t.meta.isKhmer ? "khmer-text" : ""}`}>
+              {t.analytics.sections.recentOrders}
+            </h2>
+
             {data?.recentOrders.length === 0 ? (
-              <p className="empty-state">No orders yet</p>
+              <p className={`empty-state ${t.meta.isKhmer ? "khmer-text" : ""}`}>
+                {t.analytics.empty.noOrders}
+              </p>
             ) : (
               data?.recentOrders.map((order) => {
                 const s = getStatusColor(order.status);
+
                 return (
                   <div key={order.id} className="order-row">
                     <span className="order-customer">{order.customer_name}</span>
                     <span className="order-total">${order.total.toFixed(2)}</span>
                     <span
-                      className="status-badge"
+                      className={`status-badge ${t.meta.isKhmer ? "khmer-text" : ""}`}
                       style={{ background: s.bg, color: s.color }}
                     >
-                      {order.status}
+                      {s.label}
                     </span>
                   </div>
                 );
