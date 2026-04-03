@@ -4,20 +4,31 @@ import { useEffect, useState } from "react";
 import { supabase } from "@/lib/supabase/client";
 import type { MenuItem } from "@/types/menu";
 import Link from "next/link";
+import { useLocale } from "@/i18n/locale-context";
 
 export default function OwnerMenuPage() {
+  const { t } = useLocale();
+
   const [cafeId, setCafeId] = useState<string | null>(null);
   const [menu, setMenu] = useState<MenuItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [editingItem, setEditingItem] = useState<MenuItem | null>(null);
   const [deletingId, setDeletingId] = useState<string | null>(null);
+  const [savingEdit, setSavingEdit] = useState(false);
+  const [togglingId, setTogglingId] = useState<string | null>(null);
 
   useEffect(() => {
     const init = async () => {
       try {
-        const { data: { user } } = await supabase.auth.getUser();
-        if (!user) { window.location.href = "/auth/signin"; return; }
+        const {
+          data: { user },
+        } = await supabase.auth.getUser();
+
+        if (!user) {
+          window.location.href = "/auth/signin";
+          return;
+        }
 
         const { data: profile, error: profileError } = await supabase
           .from("profiles")
@@ -26,25 +37,32 @@ export default function OwnerMenuPage() {
           .single();
 
         if (profileError) throw profileError;
-        if (!profile?.cafe_id) { window.location.href = "/auth/setup-cafe"; return; }
+
+        if (!profile?.cafe_id) {
+          window.location.href = "/auth/setup-cafe";
+          return;
+        }
 
         setCafeId(profile.cafe_id);
       } catch (err) {
-        setError(err instanceof Error ? err.message : "Failed to load profile");
+        setError(err instanceof Error ? err.message : t.menu.failedToLoadProfile);
         setLoading(false);
       }
     };
-    init();
-  }, []);
+
+    void init();
+  }, [t.menu.failedToLoadProfile]);
 
   useEffect(() => {
     if (!cafeId) return;
+
     let cancelled = false;
 
     const fetchMenu = async () => {
       try {
         setLoading(true);
         setError(null);
+
         const { data, error } = await supabase
           .from("menus")
           .select("*")
@@ -55,32 +73,56 @@ export default function OwnerMenuPage() {
         if (error) throw error;
         if (!cancelled) setMenu(data || []);
       } catch (err) {
-        if (!cancelled) setError(err instanceof Error ? err.message : "Error loading menu");
+        if (!cancelled) {
+          setError(err instanceof Error ? err.message : t.menu.errorLoadingMenu);
+        }
       } finally {
         if (!cancelled) setLoading(false);
       }
     };
 
-    fetchMenu();
-    return () => { cancelled = true; };
-  }, [cafeId]);
+    void fetchMenu();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [cafeId, t.menu.errorLoadingMenu]);
 
   const handleToggleAvailability = async (item: MenuItem) => {
+    setTogglingId(item.id);
+
     const { error } = await supabase
       .from("menus")
       .update({ is_available: !item.is_available })
       .eq("id", item.id);
 
-    if (error) { alert("Failed to update availability"); return; }
-    setMenu((prev) => prev.map((m) => m.id === item.id ? { ...m, is_available: !m.is_available } : m));
+    if (error) {
+      alert(t.menu.failedToUpdateAvailability);
+      setTogglingId(null);
+      return;
+    }
+
+    setMenu((prev) =>
+      prev.map((m) =>
+        m.id === item.id ? { ...m, is_available: !m.is_available } : m
+      )
+    );
+
+    setTogglingId(null);
   };
 
   const handleDelete = async (id: string) => {
-    if (!confirm("Are you sure you want to delete this item?")) return;
+    if (!confirm(t.menu.confirmDelete)) return;
+
     setDeletingId(id);
 
     const { error } = await supabase.from("menus").delete().eq("id", id);
-    if (error) { alert("Failed to delete item"); setDeletingId(null); return; }
+
+    if (error) {
+      alert(t.menu.failedToDeleteItem);
+      setDeletingId(null);
+      return;
+    }
 
     setMenu((prev) => prev.filter((m) => m.id !== id));
     setDeletingId(null);
@@ -88,6 +130,8 @@ export default function OwnerMenuPage() {
 
   const handleSaveEdit = async () => {
     if (!editingItem) return;
+
+    setSavingEdit(true);
 
     const { error } = await supabase
       .from("menus")
@@ -99,19 +143,31 @@ export default function OwnerMenuPage() {
       })
       .eq("id", editingItem.id);
 
-    if (error) { alert("Failed to update item"); return; }
-    setMenu((prev) => prev.map((m) => m.id === editingItem.id ? editingItem : m));
+    if (error) {
+      alert(t.menu.failedToUpdateItem);
+      setSavingEdit(false);
+      return;
+    }
+
+    setMenu((prev) =>
+      prev.map((m) => (m.id === editingItem.id ? editingItem : m))
+    );
     setEditingItem(null);
+    setSavingEdit(false);
   };
 
   return (
     <>
       <style>{`
-        @import url('https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@300;600&family=DM+Sans:wght@300;400;500&display=swap');
+        @import url('https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@300;600&family=DM+Sans:wght@300;400;500&family=Noto+Sans+Khmer:wght@300;400;500;600;700&display=swap');
 
         .menu-root {
-          font-family: 'DM Sans', sans-serif;
+          font-family: 'DM Sans', 'Noto Sans Khmer', sans-serif;
           color: #1A0F00;
+        }
+
+        .khmer-text {
+          font-family: 'Noto Sans Khmer', 'DM Sans', sans-serif;
         }
 
         .menu-header {
@@ -249,7 +305,7 @@ export default function OwnerMenuPage() {
           border-radius: 100px;
           font-size: 11px;
           font-weight: 500;
-          font-family: 'DM Sans', sans-serif;
+          font-family: 'DM Sans', 'Noto Sans Khmer', sans-serif;
           cursor: pointer;
           transition: all 0.2s;
           border: 1px solid;
@@ -292,6 +348,11 @@ export default function OwnerMenuPage() {
           color: rgba(26,15,0,0.7);
         }
 
+        .btn:disabled {
+          opacity: 0.4;
+          cursor: not-allowed;
+        }
+
         .qr-section {
           display: flex;
           justify-content: center;
@@ -330,7 +391,6 @@ export default function OwnerMenuPage() {
           cursor: not-allowed;
         }
 
-        /* MODAL */
         .modal-overlay {
           position: fixed;
           inset: 0;
@@ -379,7 +439,7 @@ export default function OwnerMenuPage() {
           background: #F7F3EE;
           color: #1A0F00;
           font-size: 13px;
-          font-family: 'DM Sans', sans-serif;
+          font-family: 'DM Sans', 'Noto Sans Khmer', sans-serif;
           outline: none;
           transition: border-color 0.2s, box-shadow 0.2s;
           margin-bottom: 16px;
@@ -409,7 +469,7 @@ export default function OwnerMenuPage() {
           background: transparent;
           color: rgba(26,15,0,0.5);
           font-size: 12px;
-          font-family: 'DM Sans', sans-serif;
+          font-family: 'DM Sans', 'Noto Sans Khmer', sans-serif;
           cursor: pointer;
           transition: all 0.2s;
         }
@@ -427,32 +487,54 @@ export default function OwnerMenuPage() {
           color: #ffffff;
           font-size: 12px;
           font-weight: 500;
-          font-family: 'DM Sans', sans-serif;
+          font-family: 'DM Sans', 'Noto Sans Khmer', sans-serif;
           cursor: pointer;
           transition: opacity 0.2s;
           letter-spacing: 0.04em;
         }
 
-        .modal-save:hover { opacity: 0.88; }
+        .modal-save:hover {
+          opacity: 0.88;
+        }
+
+        .modal-save:disabled {
+          opacity: 0.5;
+          cursor: not-allowed;
+        }
       `}</style>
 
       <div className="menu-root">
-        {/* Header */}
         <div className="menu-header">
           <div>
-            <h1 className="menu-title">Manage Menu</h1>
-            <p className="menu-sub">Add, edit, or remove items from your café menu.</p>
+            <h1 className={`menu-title ${t.meta.isKhmer ? "khmer-text" : ""}`}>
+              {t.menu.title}
+            </h1>
+            <p className={`menu-sub ${t.meta.isKhmer ? "khmer-text" : ""}`}>
+              {t.menu.subtitle}
+            </p>
           </div>
+
           <Link href="/owner/menu/add" className="add-btn">
-            + Add New Item
+            + {t.menu.addNewItem}
           </Link>
         </div>
 
-        {loading && <p className="status-msg">Loading menu…</p>}
-        {error && <div className="error-msg">{error}</div>}
+        {loading && (
+          <p className={`status-msg ${t.meta.isKhmer ? "khmer-text" : ""}`}>
+            {t.menu.loadingMenu}
+          </p>
+        )}
+
+        {error && (
+          <div className={`error-msg ${t.meta.isKhmer ? "khmer-text" : ""}`}>
+            {error}
+          </div>
+        )}
 
         {!loading && !error && menu.length === 0 && (
-          <p className="status-msg">No menu items yet. Add your first item!</p>
+          <p className={`status-msg ${t.meta.isKhmer ? "khmer-text" : ""}`}>
+            {t.menu.emptyState}
+          </p>
         )}
 
         {!loading && !error && menu.length > 0 && (
@@ -460,25 +542,45 @@ export default function OwnerMenuPage() {
             {menu.map((item) => (
               <div key={item.id} className="menu-card">
                 {!item.is_available && (
-                  <span className="unavailable-badge">Unavailable</span>
+                  <span className={`unavailable-badge ${t.meta.isKhmer ? "khmer-text" : ""}`}>
+                    {t.menu.unavailable}
+                  </span>
                 )}
+
                 <h3 className="item-name">{item.name}</h3>
-                <p className="item-desc">{item.description}</p>
+                <p className={`item-desc ${t.meta.isKhmer ? "khmer-text" : ""}`}>
+                  {item.description || t.menu.noDescription}
+                </p>
                 <p className="item-price">${item.price.toFixed(2)}</p>
 
                 <div className="card-actions">
-                  <button onClick={() => setEditingItem(item)} className="btn btn-edit">
-                    Edit
+                  <button
+                    onClick={() => setEditingItem(item)}
+                    className="btn btn-edit"
+                  >
+                    {t.menu.actions.edit}
                   </button>
+
                   <button
                     onClick={() => handleDelete(item.id)}
                     disabled={deletingId === item.id}
                     className="btn btn-delete"
                   >
-                    {deletingId === item.id ? "Deleting..." : "Delete"}
+                    {deletingId === item.id
+                      ? t.menu.actions.deleting
+                      : t.menu.actions.delete}
                   </button>
-                  <button onClick={() => handleToggleAvailability(item)} className="btn btn-toggle">
-                    {item.is_available ? "Mark Unavailable" : "Mark Available"}
+
+                  <button
+                    onClick={() => handleToggleAvailability(item)}
+                    disabled={togglingId === item.id}
+                    className="btn btn-toggle"
+                  >
+                    {togglingId === item.id
+                      ? t.menu.actions.updating
+                      : item.is_available
+                      ? t.menu.actions.markUnavailable
+                      : t.menu.actions.markAvailable}
                   </button>
                 </div>
               </div>
@@ -486,44 +588,59 @@ export default function OwnerMenuPage() {
           </div>
         )}
 
-        {/* QR Button */}
         <div className="qr-section">
           <Link
             href="/owner/menuQR"
-            className={`qr-btn ${menu.length > 0 ? "active" : "disabled"}`}
+            className={`qr-btn ${menu.length > 0 ? "active" : "disabled"} ${
+              t.meta.isKhmer ? "khmer-text" : ""
+            }`}
           >
-            ▣ Generate QR for Menu
+            ▣ {t.menu.generateQr}
           </Link>
         </div>
       </div>
 
-      {/* Edit Modal */}
       {editingItem && (
         <div className="modal-overlay">
           <div className="modal-card">
-            <h2 className="modal-title">Edit Menu Item</h2>
+            <h2 className={`modal-title ${t.meta.isKhmer ? "khmer-text" : ""}`}>
+              {t.menu.modal.editTitle}
+            </h2>
 
-            <label htmlFor="edit-name" className="modal-label">Name</label>
+            <label htmlFor="edit-name" className={`modal-label ${t.meta.isKhmer ? "khmer-text" : ""}`}>
+              {t.menu.modal.name}
+            </label>
             <input
               id="edit-name"
               className="modal-input"
-              placeholder="Item name"
+              placeholder={t.menu.modal.namePlaceholder}
               value={editingItem.name}
-              onChange={(e) => setEditingItem({ ...editingItem, name: e.target.value })}
+              onChange={(e) =>
+                setEditingItem({ ...editingItem, name: e.target.value })
+              }
             />
 
-            <label htmlFor="edit-description" className="modal-label">Description</label>
+            <label
+              htmlFor="edit-description"
+              className={`modal-label ${t.meta.isKhmer ? "khmer-text" : ""}`}
+            >
+              {t.menu.modal.description}
+            </label>
             <textarea
               id="edit-description"
               className="modal-input"
-              placeholder="Item description"
+              placeholder={t.menu.modal.descriptionPlaceholder}
               rows={2}
               style={{ resize: "none" }}
               value={editingItem.description || ""}
-              onChange={(e) => setEditingItem({ ...editingItem, description: e.target.value })}
+              onChange={(e) =>
+                setEditingItem({ ...editingItem, description: e.target.value })
+              }
             />
 
-            <label htmlFor="edit-price" className="modal-label">Price</label>
+            <label htmlFor="edit-price" className={`modal-label ${t.meta.isKhmer ? "khmer-text" : ""}`}>
+              {t.menu.modal.price}
+            </label>
             <input
               id="edit-price"
               type="number"
@@ -531,16 +648,26 @@ export default function OwnerMenuPage() {
               placeholder="0.00"
               value={editingItem.price}
               onChange={(e) =>
-                setEditingItem({ ...editingItem, price: parseFloat(e.target.value) })
+                setEditingItem({
+                  ...editingItem,
+                  price: parseFloat(e.target.value) || 0,
+                })
               }
             />
 
             <div className="modal-actions">
-              <button onClick={() => setEditingItem(null)} className="modal-cancel">
-                Cancel
+              <button
+                onClick={() => setEditingItem(null)}
+                className="modal-cancel"
+              >
+                {t.menu.modal.cancel}
               </button>
-              <button onClick={handleSaveEdit} className="modal-save">
-                Save Changes
+              <button
+                onClick={handleSaveEdit}
+                className="modal-save"
+                disabled={savingEdit}
+              >
+                {savingEdit ? t.menu.modal.saving : t.menu.modal.saveChanges}
               </button>
             </div>
           </div>

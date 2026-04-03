@@ -3,10 +3,12 @@
 import { useEffect } from "react";
 import { supabase } from "@/lib/supabase/client";
 
-export default function OwnerIndexPage() {
+export default function OwnerPage() {
   useEffect(() => {
     const check = async () => {
-      const { data: { user } } = await supabase.auth.getUser();
+      const {
+        data: { user },
+      } = await supabase.auth.getUser();
 
       if (!user) {
         window.location.href = "/owner/login";
@@ -26,20 +28,12 @@ export default function OwnerIndexPage() {
       }
     };
 
-    check();
+    void check();
   }, []);
 
   return (
-    <div style={{
-      minHeight: "100vh",
-      background: "#0E0A07",
-      display: "flex",
-      alignItems: "center",
-      justifyContent: "center",
-      fontFamily: "'DM Sans', sans-serif",
-      color: "rgba(245,230,208,0.4)"
-    }}>
-      Redirecting...
+    <div className="flex min-h-screen items-center justify-center">
+      Loading...
     </div>
   );
 }
