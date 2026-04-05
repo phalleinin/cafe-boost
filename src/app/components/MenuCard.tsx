@@ -28,6 +28,28 @@ export default function MenuCard({ item, isOrderEnabled, onAddToCart }: Props) {
           transform: translateY(-2px);
         }
 
+        .menu-card-image {
+          width: 100%;
+          height: 140px;
+          object-fit: cover;
+          border-radius: 12px;
+          margin-bottom: 12px;
+          display: block;
+        }
+
+        .menu-card-image-fallback {
+          width: 100%;
+          height: 140px;
+          border-radius: 12px;
+          margin-bottom: 12px;
+          background: #f3f3f3;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          font-size: 12px;
+          color: #999;
+        }
+
         .menu-card-name {
           font-family: 'Cormorant Garamond', serif;
           font-size: 20px;
@@ -83,15 +105,25 @@ export default function MenuCard({ item, isOrderEnabled, onAddToCart }: Props) {
       `}</style>
 
       <div className="menu-card">
+        {item.image_url ? (
+          <>
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img
+              src={item.image_url}
+              alt={item.name}
+              className="menu-card-image"
+            />
+          </>
+        ) : (
+          <div className="menu-card-image-fallback">No Image</div>
+        )}
+
         <h3 className="menu-card-name">{item.name}</h3>
         <p className="menu-card-desc">{item.description || "Delicious café item"}</p>
         <p className="menu-card-price">${item.price.toFixed(2)}</p>
 
         {isOrderEnabled && onAddToCart && (
-          <button
-            onClick={() => onAddToCart(item)}
-            className="menu-card-btn"
-          >
+          <button onClick={() => onAddToCart(item)} className="menu-card-btn">
             + Add to Order
           </button>
         )}
