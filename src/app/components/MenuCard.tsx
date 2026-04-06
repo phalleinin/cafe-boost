@@ -1,133 +1,188 @@
-// components/MenuCard.tsx
+"use client";
+
 import type { MenuItem } from "@/types/menu";
 
-interface Props {
+type MenuCardProps = {
   item: MenuItem;
   isOrderEnabled?: boolean;
   onAddToCart?: (item: MenuItem) => void;
-}
+};
 
-export default function MenuCard({ item, isOrderEnabled, onAddToCart }: Props) {
+export default function MenuCard({
+  item,
+  isOrderEnabled = false,
+  onAddToCart,
+}: MenuCardProps) {
   return (
     <>
       <style>{`
-        .menu-card {
-          background: #ffffff;
-          border: 1px solid rgba(200,135,58,0.12);
-          border-radius: 18px;
-          padding: 24px;
-          transition: border-color 0.2s, box-shadow 0.2s, transform 0.2s;
-          box-shadow: 0 2px 8px rgba(0,0,0,0.03);
+        .qr-menu-card {
+          background: rgba(255,255,255,0.88);
+          border: 1px solid rgba(200, 135, 58, 0.12);
+          border-radius: 28px;
+          padding: 16px;
+          box-shadow: 0 10px 28px rgba(26, 15, 0, 0.06);
           display: flex;
           flex-direction: column;
+          overflow: hidden;
+          transition: transform 0.22s ease, box-shadow 0.22s ease, border-color 0.22s ease;
         }
 
-        .menu-card:hover {
-          border-color: rgba(200,135,58,0.28);
-          box-shadow: 0 8px 24px rgba(200,135,58,0.09);
-          transform: translateY(-2px);
+        .qr-menu-card:hover {
+          transform: translateY(-4px);
+          box-shadow: 0 16px 36px rgba(26, 15, 0, 0.08);
+          border-color: rgba(200, 135, 58, 0.2);
         }
 
-        .menu-card-image {
+        .qr-menu-image-wrap {
+          position: relative;
           width: 100%;
-          height: 140px;
-          object-fit: cover;
-          border-radius: 12px;
-          margin-bottom: 12px;
-          display: block;
-        }
-
-        .menu-card-image-fallback {
-          width: 100%;
-          height: 140px;
-          border-radius: 12px;
-          margin-bottom: 12px;
-          background: #f3f3f3;
+          height: 260px;
+          border-radius: 22px;
+          background: linear-gradient(180deg, #fbf8f3 0%, #f2ebe2 100%);
+          border: 1px solid rgba(200, 135, 58, 0.08);
           display: flex;
           align-items: center;
           justify-content: center;
-          font-size: 12px;
-          color: #999;
-        }
-
-        .menu-card-name {
-          font-family: 'Cormorant Garamond', serif;
-          font-size: 20px;
-          font-weight: 600;
-          color: #1A0F00;
-          margin-bottom: 6px;
-          letter-spacing: 0.01em;
-        }
-
-        .menu-card-desc {
-          font-size: 12px;
-          color: rgba(26,15,0,0.4);
-          font-weight: 300;
-          line-height: 1.5;
-          margin-bottom: 16px;
-          flex: 1;
-        }
-
-        .menu-card-price {
-          font-family: 'Cormorant Garamond', serif;
-          font-size: 22px;
-          font-weight: 600;
-          color: #C8873A;
+          overflow: hidden;
+          padding: 20px;
           margin-bottom: 16px;
         }
 
-        .menu-card-btn {
-          display: inline-flex;
+        .qr-menu-image {
+          width: 100%;
+          height: 100%;
+          object-fit: contain;
+          object-position: center;
+          display: block;
+          filter: drop-shadow(0 12px 18px rgba(55, 34, 12, 0.10));
+          transition: transform 0.25s ease;
+        }
+
+        .qr-menu-card:hover .qr-menu-image {
+          transform: scale(1.02);
+        }
+
+        .qr-menu-image-fallback {
+          width: 100%;
+          height: 260px;
+          border-radius: 22px;
+          background: linear-gradient(135deg, #f6f0e8, #efe4d4);
+          border: 1px solid rgba(200, 135, 58, 0.08);
+          display: flex;
           align-items: center;
           justify-content: center;
-          gap: 6px;
-          background: rgba(200,135,58,0.08);
-          color: #C8873A;
-          border: 1px solid rgba(200,135,58,0.25);
-          padding: 10px 20px;
-          border-radius: 100px;
-          font-size: 12px;
-          font-weight: 500;
-          font-family: 'DM Sans', sans-serif;
-          cursor: pointer;
-          transition: all 0.2s;
-          letter-spacing: 0.06em;
-          text-transform: uppercase;
-          width: 100%;
+          color: rgba(26, 15, 0, 0.34);
+          font-size: 13px;
+          margin-bottom: 16px;
         }
 
-        .menu-card-btn:hover {
+        .qr-menu-name {
+          margin: 0 0 8px;
+          font-family: 'Cormorant Garamond', serif;
+          font-size: 34px;
+          line-height: 0.95;
+          font-weight: 600;
+          color: #1A0F00;
+        }
+
+        .qr-menu-desc {
+          margin: 0;
+          min-height: 44px;
+          font-size: 14px;
+          line-height: 1.6;
+          color: rgba(26, 15, 0, 0.55);
+        }
+
+        .qr-menu-footer {
+          margin-top: auto;
+          padding-top: 18px;
+          display: flex;
+          align-items: center;
+          justify-content: space-between;
+          gap: 12px;
+          flex-wrap: wrap;
+        }
+
+        .qr-menu-price {
+          font-family: 'Cormorant Garamond', serif;
+          font-size: 38px;
+          line-height: 1;
+          font-weight: 600;
+          color: #C8873A;
+          white-space: nowrap;
+        }
+
+        .qr-menu-order-btn {
+          border: none;
+          border-radius: 999px;
           background: #C8873A;
           color: #ffffff;
-          border-color: #C8873A;
-          box-shadow: 0 4px 12px rgba(200,135,58,0.25);
+          padding: 11px 18px;
+          font-size: 12px;
+          font-weight: 600;
+          letter-spacing: 0.04em;
+          cursor: pointer;
+          box-shadow: 0 6px 16px rgba(200,135,58,0.24);
+          transition: opacity 0.2s ease, transform 0.2s ease;
+        }
+
+        .qr-menu-order-btn:hover {
+          opacity: 0.92;
+          transform: translateY(-1px);
+        }
+
+        @media (max-width: 640px) {
+          .qr-menu-image-wrap,
+          .qr-menu-image-fallback {
+            height: 230px;
+            padding: 16px;
+          }
+
+          .qr-menu-name {
+            font-size: 30px;
+          }
+
+          .qr-menu-price {
+            font-size: 34px;
+          }
         }
       `}</style>
 
-      <div className="menu-card">
+      <article className="qr-menu-card">
         {item.image_url ? (
-          <>
+          <div className="qr-menu-image-wrap">
             {/* eslint-disable-next-line @next/next/no-img-element */}
             <img
               src={item.image_url}
               alt={item.name}
-              className="menu-card-image"
+              className="qr-menu-image"
             />
-          </>
+          </div>
         ) : (
-          <div className="menu-card-image-fallback">No Image</div>
+          <div className="qr-menu-image-fallback">No Image</div>
         )}
 
-        <h3 className="menu-card-name">{item.name}</h3>
-        <p className="menu-card-desc">{item.description || "Delicious café item"}</p>
-        <p className="menu-card-price">${item.price.toFixed(2)}</p>
+        <h3 className="qr-menu-name">{item.name}</h3>
 
-        {isOrderEnabled && onAddToCart && (
-          <button onClick={() => onAddToCart(item)} className="menu-card-btn">
-            + Add to Order
-          </button>
-        )}
-      </div>
+        <p className="qr-menu-desc">
+          {item.description?.trim() || "No description available."}
+        </p>
+
+        <div className="qr-menu-footer">
+          <div className="qr-menu-price">${item.price.toFixed(2)}</div>
+
+          {isOrderEnabled && onAddToCart && (
+            <button
+              type="button"
+              className="qr-menu-order-btn"
+              onClick={() => onAddToCart(item)}
+            >
+              Add to Order
+            </button>
+          )}
+        </div>
+      </article>
     </>
   );
 }

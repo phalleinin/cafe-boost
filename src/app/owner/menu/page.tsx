@@ -305,24 +305,28 @@ export default function OwnerMenuPage() {
         .image-wrapper {
           position: relative;
           width: 100%;
-          height: 220px;
+          height: 260px;
           overflow: hidden;
           border-radius: 20px;
           margin-bottom: 18px;
-          background: #f4efe8;
+          background: #f8f6f2;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          padding: 20px;
         }
 
         .item-image {
           width: 100%;
           height: 100%;
-          object-fit: cover;
+          object-fit: contain;
           object-position: center;
           display: block;
           transition: transform 0.35s ease;
         }
 
         .menu-card:hover .item-image {
-          transform: scale(1.05);
+          transform: scale(1.03);
         }
 
         .image-overlay {
@@ -330,7 +334,7 @@ export default function OwnerMenuPage() {
           inset: 0;
           background: linear-gradient(
             to top,
-            rgba(26,15,0,0.10) 0%,
+            rgba(26,15,0,0.04) 0%,
             rgba(26,15,0,0.00) 45%
           );
           pointer-events: none;
@@ -338,7 +342,7 @@ export default function OwnerMenuPage() {
 
         .item-image-fallback {
           width: 100%;
-          height: 220px;
+          height: 260px;
           border-radius: 20px;
           margin-bottom: 18px;
           background: linear-gradient(135deg, #f6f0e8, #efe4d4);
@@ -563,13 +567,15 @@ export default function OwnerMenuPage() {
 
         .modal-image-preview {
           width: 100%;
-          height: 190px;
-          object-fit: cover;
+          height: 220px;
+          object-fit: contain;
           object-position: center;
           border-radius: 16px;
           margin-bottom: 18px;
           border: 1px solid rgba(200,135,58,0.12);
           display: block;
+          background: #f8f6f2;
+          padding: 12px;
         }
 
         .modal-actions {
