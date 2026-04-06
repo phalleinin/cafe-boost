@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { supabase } from "@/lib/supabase/client";
+import { uploadMenuImage } from "@/lib/uploadImage";
 import type { MenuItem } from "@/types/menu";
 import Link from "next/link";
 import { useLocale } from "@/i18n/locale-context";
@@ -17,6 +18,9 @@ export default function OwnerMenuPage() {
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const [savingEdit, setSavingEdit] = useState(false);
   const [togglingId, setTogglingId] = useState<string | null>(null);
+
+  const [editImage, setEditImage] = useState<File | null>(null);
+  const [editPreview, setEditPreview] = useState<string | null>(null);
 
   useEffect(() => {
     const init = async () => {
@@ -88,6 +92,14 @@ export default function OwnerMenuPage() {
     };
   }, [cafeId, t.menu.errorLoadingMenu]);
 
+  useEffect(() => {
+    return () => {
+      if (editPreview && editPreview.startsWith("blob:")) {
+        URL.revokeObjectURL(editPreview);
+      }
+    };
+  }, [editPreview]);
+
   const handleToggleAvailability = async (item: MenuItem) => {
     setTogglingId(item.id);
 
@@ -133,27 +145,61 @@ export default function OwnerMenuPage() {
 
     setSavingEdit(true);
 
-    const { error } = await supabase
-      .from("menus")
-      .update({
-        name: editingItem.name,
-        description: editingItem.description,
-        price: editingItem.price,
-        is_available: editingItem.is_available,
-      })
-      .eq("id", editingItem.id);
+    try {
+      let imageUrl = editingItem.image_url;
 
-    if (error) {
+      if (editImage) {
+        imageUrl = await uploadMenuImage(editImage);
+      }
+
+      const updatedItem: MenuItem = {
+        ...editingItem,
+        image_url: imageUrl,
+      };
+
+      const { error } = await supabase
+        .from("menus")
+        .update({
+          name: updatedItem.name,
+          description: updatedItem.description,
+          price: updatedItem.price,
+          is_available: updatedItem.is_available,
+          image_url: updatedItem.image_url,
+        })
+        .eq("id", updatedItem.id);
+
+      if (error) {
+        alert(t.menu.failedToUpdateItem);
+        setSavingEdit(false);
+        return;
+      }
+
+      setMenu((prev) =>
+        prev.map((m) => (m.id === updatedItem.id ? updatedItem : m))
+      );
+
+      if (editPreview && editPreview.startsWith("blob:")) {
+        URL.revokeObjectURL(editPreview);
+      }
+
+      setEditingItem(null);
+      setEditImage(null);
+      setEditPreview(null);
+      setSavingEdit(false);
+    } catch {
       alert(t.menu.failedToUpdateItem);
       setSavingEdit(false);
-      return;
+    }
+  };
+
+  const closeEditModal = () => {
+    if (editPreview && editPreview.startsWith("blob:")) {
+      URL.revokeObjectURL(editPreview);
     }
 
-    setMenu((prev) =>
-      prev.map((m) => (m.id === editingItem.id ? editingItem : m))
-    );
     setEditingItem(null);
-    setSavingEdit(false);
+    setEditImage(null);
+    setEditPreview(null);
   };
 
   return (
@@ -174,50 +220,51 @@ export default function OwnerMenuPage() {
           display: flex;
           align-items: flex-end;
           justify-content: space-between;
-          margin-bottom: 28px;
+          margin-bottom: 36px;
           flex-wrap: wrap;
-          gap: 16px;
+          gap: 20px;
         }
 
         .menu-title {
           font-family: 'Cormorant Garamond', serif;
-          font-size: 28px;
+          font-size: 52px;
+          line-height: 0.95;
           font-weight: 600;
           color: #1A0F00;
-          margin-bottom: 4px;
+          margin-bottom: 8px;
         }
 
         .menu-sub {
-          font-size: 13px;
-          color: rgba(26,15,0,0.4);
+          font-size: 18px;
+          color: rgba(26,15,0,0.42);
           font-weight: 300;
         }
 
         .add-btn {
           display: inline-flex;
           align-items: center;
-          gap: 6px;
+          gap: 8px;
           background: #C8873A;
           color: #ffffff;
-          padding: 10px 22px;
-          border-radius: 100px;
-          font-size: 13px;
-          font-weight: 500;
-          letter-spacing: 0.04em;
+          padding: 14px 28px;
+          border-radius: 999px;
+          font-size: 15px;
+          font-weight: 600;
+          letter-spacing: 0.02em;
           text-decoration: none;
-          transition: opacity 0.2s, transform 0.2s;
-          box-shadow: 0 4px 12px rgba(200,135,58,0.25);
+          transition: opacity 0.2s, transform 0.2s, box-shadow 0.2s;
+          box-shadow: 0 10px 24px rgba(200,135,58,0.24);
         }
 
         .add-btn:hover {
-          opacity: 0.88;
-          transform: translateY(-1px);
+          opacity: 0.92;
+          transform: translateY(-2px);
         }
 
         .status-msg {
-          font-size: 13px;
-          color: rgba(26,15,0,0.35);
-          padding: 32px 0;
+          font-size: 14px;
+          color: rgba(26,15,0,0.38);
+          padding: 36px 0;
           text-align: center;
         }
 
@@ -226,90 +273,148 @@ export default function OwnerMenuPage() {
           color: #C03030;
           background: rgba(220,50,50,0.06);
           border: 1px solid rgba(220,50,50,0.15);
-          padding: 10px 16px;
-          border-radius: 10px;
-          margin-bottom: 16px;
+          padding: 12px 16px;
+          border-radius: 12px;
+          margin-bottom: 18px;
         }
 
         .menu-grid {
           display: grid;
-          grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
-          gap: 16px;
-          margin-bottom: 32px;
+          grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+          gap: 24px;
+          margin-bottom: 40px;
         }
 
         .menu-card {
-          background: #ffffff;
+          background: rgba(255,255,255,0.78);
+          backdrop-filter: blur(10px);
           border: 1px solid rgba(200,135,58,0.12);
-          border-radius: 18px;
-          padding: 24px;
-          transition: border-color 0.2s, box-shadow 0.2s, transform 0.2s;
-          box-shadow: 0 2px 8px rgba(0,0,0,0.03);
+          border-radius: 28px;
+          padding: 20px;
+          transition: transform 0.25s ease, box-shadow 0.25s ease, border-color 0.25s ease;
+          box-shadow: 0 10px 30px rgba(26,15,0,0.05);
+          overflow: hidden;
         }
 
         .menu-card:hover {
-          border-color: rgba(200,135,58,0.25);
-          box-shadow: 0 8px 24px rgba(200,135,58,0.08);
-          transform: translateY(-2px);
+          transform: translateY(-6px);
+          border-color: rgba(200,135,58,0.22);
+          box-shadow: 0 18px 44px rgba(26,15,0,0.09);
+        }
+
+        .image-wrapper {
+          position: relative;
+          width: 100%;
+          height: 260px;
+          overflow: hidden;
+          border-radius: 20px;
+          margin-bottom: 18px;
+          background: #f8f6f2;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          padding: 20px;
+        }
+
+        .item-image {
+          width: 100%;
+          height: 100%;
+          object-fit: contain;
+          object-position: center;
+          display: block;
+          transition: transform 0.35s ease;
+        }
+
+        .menu-card:hover .item-image {
+          transform: scale(1.03);
+        }
+
+        .image-overlay {
+          position: absolute;
+          inset: 0;
+          background: linear-gradient(
+            to top,
+            rgba(26,15,0,0.04) 0%,
+            rgba(26,15,0,0.00) 45%
+          );
+          pointer-events: none;
+        }
+
+        .item-image-fallback {
+          width: 100%;
+          height: 260px;
+          border-radius: 20px;
+          margin-bottom: 18px;
+          background: linear-gradient(135deg, #f6f0e8, #efe4d4);
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          color: rgba(26,15,0,0.35);
+          font-size: 13px;
+          border: 1px solid rgba(200,135,58,0.08);
         }
 
         .unavailable-badge {
-          display: inline-block;
+          display: inline-flex;
+          align-items: center;
           font-size: 10px;
-          font-weight: 500;
-          letter-spacing: 0.1em;
+          font-weight: 600;
+          letter-spacing: 0.12em;
           text-transform: uppercase;
           color: #C03030;
           background: rgba(220,50,50,0.08);
           border: 1px solid rgba(220,50,50,0.15);
-          padding: 2px 10px;
-          border-radius: 100px;
+          padding: 5px 10px;
+          border-radius: 999px;
           margin-bottom: 12px;
         }
 
         .item-name {
           font-family: 'Cormorant Garamond', serif;
-          font-size: 20px;
+          font-size: 34px;
+          line-height: 1;
           font-weight: 600;
           color: #1A0F00;
-          margin-bottom: 4px;
+          margin-bottom: 8px;
         }
 
         .item-desc {
-          font-size: 12px;
-          color: rgba(26,15,0,0.4);
-          font-weight: 300;
-          line-height: 1.5;
-          margin-bottom: 12px;
-          min-height: 18px;
+          font-size: 14px;
+          color: rgba(26,15,0,0.50);
+          font-weight: 400;
+          line-height: 1.6;
+          margin-bottom: 18px;
+          min-height: 44px;
         }
 
         .item-price {
           font-family: 'Cormorant Garamond', serif;
-          font-size: 22px;
+          font-size: 38px;
+          line-height: 1;
           font-weight: 600;
           color: #C8873A;
-          margin-bottom: 16px;
+          margin-bottom: 20px;
         }
 
         .card-actions {
           display: flex;
-          gap: 6px;
+          gap: 10px;
           flex-wrap: wrap;
-          padding-top: 12px;
+          padding-top: 16px;
           border-top: 1px solid rgba(200,135,58,0.08);
         }
 
         .btn {
-          padding: 7px 14px;
-          border-radius: 100px;
-          font-size: 11px;
+          padding: 10px 16px;
+          border-radius: 999px;
+          font-size: 12px;
           font-weight: 500;
           font-family: 'DM Sans', 'Noto Sans Khmer', sans-serif;
           cursor: pointer;
-          transition: all 0.2s;
+          transition: all 0.2s ease;
           border: 1px solid;
-          letter-spacing: 0.04em;
+          letter-spacing: 0.03em;
+          background: white;
         }
 
         .btn-edit {
@@ -319,17 +424,21 @@ export default function OwnerMenuPage() {
         }
 
         .btn-edit:hover {
-          background: rgba(200,135,58,0.16);
+          background: #C8873A;
+          color: white;
+          border-color: #C8873A;
         }
 
         .btn-delete {
           background: rgba(220,50,50,0.06);
           color: #C03030;
-          border-color: rgba(220,50,50,0.2);
+          border-color: rgba(220,50,50,0.20);
         }
 
         .btn-delete:hover {
-          background: rgba(220,50,50,0.12);
+          background: #C03030;
+          color: white;
+          border-color: #C03030;
         }
 
         .btn-delete:disabled {
@@ -339,13 +448,13 @@ export default function OwnerMenuPage() {
 
         .btn-toggle {
           background: rgba(26,15,0,0.04);
-          color: rgba(26,15,0,0.5);
-          border-color: rgba(26,15,0,0.1);
+          color: rgba(26,15,0,0.58);
+          border-color: rgba(26,15,0,0.10);
         }
 
         .btn-toggle:hover {
-          background: rgba(26,15,0,0.08);
-          color: rgba(26,15,0,0.7);
+          background: rgba(26,15,0,0.10);
+          color: #1A0F00;
         }
 
         .btn:disabled {
@@ -356,7 +465,7 @@ export default function OwnerMenuPage() {
         .qr-section {
           display: flex;
           justify-content: center;
-          padding-top: 16px;
+          padding-top: 18px;
           border-top: 1px solid rgba(200,135,58,0.1);
         }
 
@@ -364,11 +473,11 @@ export default function OwnerMenuPage() {
           display: inline-flex;
           align-items: center;
           gap: 8px;
-          padding: 12px 28px;
-          border-radius: 100px;
-          font-size: 13px;
-          font-weight: 500;
-          letter-spacing: 0.04em;
+          padding: 14px 30px;
+          border-radius: 999px;
+          font-size: 14px;
+          font-weight: 600;
+          letter-spacing: 0.03em;
           text-decoration: none;
           transition: all 0.2s;
         }
@@ -376,12 +485,12 @@ export default function OwnerMenuPage() {
         .qr-btn.active {
           background: #C8873A;
           color: #ffffff;
-          box-shadow: 0 4px 12px rgba(200,135,58,0.25);
+          box-shadow: 0 10px 24px rgba(200,135,58,0.24);
         }
 
         .qr-btn.active:hover {
-          opacity: 0.88;
-          transform: translateY(-1px);
+          opacity: 0.92;
+          transform: translateY(-2px);
         }
 
         .qr-btn.disabled {
@@ -405,20 +514,21 @@ export default function OwnerMenuPage() {
 
         .modal-card {
           background: #ffffff;
-          border-radius: 20px;
+          border-radius: 28px;
           padding: 32px;
           width: 100%;
-          max-width: 420px;
-          box-shadow: 0 24px 64px rgba(0,0,0,0.12);
-          border: 1px solid rgba(200,135,58,0.15);
+          max-width: 520px;
+          box-shadow: 0 28px 80px rgba(0,0,0,0.14);
+          border: 1px solid rgba(200,135,58,0.12);
         }
 
         .modal-title {
           font-family: 'Cormorant Garamond', serif;
-          font-size: 22px;
+          font-size: 38px;
+          line-height: 1;
           font-weight: 600;
           color: #1A0F00;
-          margin-bottom: 20px;
+          margin-bottom: 24px;
         }
 
         .modal-label {
@@ -433,16 +543,16 @@ export default function OwnerMenuPage() {
 
         .modal-input {
           width: 100%;
-          padding: 10px 14px;
-          border: 1px solid rgba(200,135,58,0.2);
-          border-radius: 10px;
+          padding: 14px 16px;
+          border: 1px solid rgba(200,135,58,0.20);
+          border-radius: 16px;
           background: #F7F3EE;
           color: #1A0F00;
-          font-size: 13px;
+          font-size: 15px;
           font-family: 'DM Sans', 'Noto Sans Khmer', sans-serif;
           outline: none;
-          transition: border-color 0.2s, box-shadow 0.2s;
-          margin-bottom: 16px;
+          transition: border-color 0.2s, box-shadow 0.2s, background 0.2s;
+          margin-bottom: 18px;
         }
 
         .modal-input:focus {
@@ -455,6 +565,19 @@ export default function OwnerMenuPage() {
           color: rgba(26,15,0,0.22);
         }
 
+        .modal-image-preview {
+          width: 100%;
+          height: 220px;
+          object-fit: contain;
+          object-position: center;
+          border-radius: 16px;
+          margin-bottom: 18px;
+          border: 1px solid rgba(200,135,58,0.12);
+          display: block;
+          background: #f8f6f2;
+          padding: 12px;
+        }
+
         .modal-actions {
           display: flex;
           justify-content: flex-end;
@@ -463,12 +586,12 @@ export default function OwnerMenuPage() {
         }
 
         .modal-cancel {
-          padding: 10px 20px;
-          border-radius: 100px;
+          padding: 12px 22px;
+          border-radius: 999px;
           border: 1px solid rgba(26,15,0,0.12);
           background: transparent;
           color: rgba(26,15,0,0.5);
-          font-size: 12px;
+          font-size: 13px;
           font-family: 'DM Sans', 'Noto Sans Khmer', sans-serif;
           cursor: pointer;
           transition: all 0.2s;
@@ -480,21 +603,22 @@ export default function OwnerMenuPage() {
         }
 
         .modal-save {
-          padding: 10px 24px;
-          border-radius: 100px;
+          padding: 12px 26px;
+          border-radius: 999px;
           border: none;
           background: #C8873A;
           color: #ffffff;
-          font-size: 12px;
-          font-weight: 500;
+          font-size: 13px;
+          font-weight: 600;
           font-family: 'DM Sans', 'Noto Sans Khmer', sans-serif;
           cursor: pointer;
-          transition: opacity 0.2s;
-          letter-spacing: 0.04em;
+          transition: opacity 0.2s, transform 0.2s;
+          letter-spacing: 0.03em;
         }
 
         .modal-save:hover {
-          opacity: 0.88;
+          opacity: 0.92;
+          transform: translateY(-1px);
         }
 
         .modal-save:disabled {
@@ -541,6 +665,20 @@ export default function OwnerMenuPage() {
           <div className="menu-grid">
             {menu.map((item) => (
               <div key={item.id} className="menu-card">
+                {item.image_url ? (
+                  <div className="image-wrapper">
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img
+                      src={item.image_url}
+                      alt={item.name}
+                      className="item-image"
+                    />
+                    <div className="image-overlay" />
+                  </div>
+                ) : (
+                  <div className="item-image-fallback">No Image</div>
+                )}
+
                 {!item.is_available && (
                   <span className={`unavailable-badge ${t.meta.isKhmer ? "khmer-text" : ""}`}>
                     {t.menu.unavailable}
@@ -555,7 +693,11 @@ export default function OwnerMenuPage() {
 
                 <div className="card-actions">
                   <button
-                    onClick={() => setEditingItem(item)}
+                    onClick={() => {
+                      setEditingItem(item);
+                      setEditImage(null);
+                      setEditPreview(item.image_url || null);
+                    }}
                     className="btn btn-edit"
                   >
                     {t.menu.actions.edit}
@@ -607,7 +749,42 @@ export default function OwnerMenuPage() {
               {t.menu.modal.editTitle}
             </h2>
 
-            <label htmlFor="edit-name" className={`modal-label ${t.meta.isKhmer ? "khmer-text" : ""}`}>
+            <label className={`modal-label ${t.meta.isKhmer ? "khmer-text" : ""}`}>
+              Item Image
+            </label>
+            <input
+              type="file"
+              accept="image/*"
+              className="modal-input"
+              onChange={(e) => {
+                const file = e.target.files?.[0] || null;
+
+                if (editPreview && editPreview.startsWith("blob:")) {
+                  URL.revokeObjectURL(editPreview);
+                }
+
+                setEditImage(file);
+                setEditPreview(
+                  file ? URL.createObjectURL(file) : editingItem.image_url || null
+                );
+              }}
+            />
+
+            {editPreview && (
+              <>
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img
+                  src={editPreview}
+                  alt="Edit item preview"
+                  className="modal-image-preview"
+                />
+              </>
+            )}
+
+            <label
+              htmlFor="edit-name"
+              className={`modal-label ${t.meta.isKhmer ? "khmer-text" : ""}`}
+            >
               {t.menu.modal.name}
             </label>
             <input
@@ -638,7 +815,10 @@ export default function OwnerMenuPage() {
               }
             />
 
-            <label htmlFor="edit-price" className={`modal-label ${t.meta.isKhmer ? "khmer-text" : ""}`}>
+            <label
+              htmlFor="edit-price"
+              className={`modal-label ${t.meta.isKhmer ? "khmer-text" : ""}`}
+            >
               {t.menu.modal.price}
             </label>
             <input
@@ -656,10 +836,7 @@ export default function OwnerMenuPage() {
             />
 
             <div className="modal-actions">
-              <button
-                onClick={() => setEditingItem(null)}
-                className="modal-cancel"
-              >
+              <button onClick={closeEditModal} className="modal-cancel">
                 {t.menu.modal.cancel}
               </button>
               <button

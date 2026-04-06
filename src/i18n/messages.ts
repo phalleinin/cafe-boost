@@ -170,6 +170,8 @@ export type Messages = {
     title: string;
     subtitle: string;
     back: string;
+    image: string;
+    imagePreviewAlt: string;
     name: string;
     namePlaceholder: string;
     description: string;
@@ -358,6 +360,8 @@ export const messages: Record<Locale, Messages> = {
       title: "Add Menu Item",
       subtitle: "Fill details",
       back: "Back to Menu",
+      image: "Item Image",
+      imagePreviewAlt: "Selected menu image preview",
       name: "Item Name",
       namePlaceholder: "e.g. Latte",
       description: "Description",
@@ -544,6 +548,8 @@ export const messages: Record<Locale, Messages> = {
       title: "បន្ថែមមុខម្ហូប",
       subtitle: "បំពេញព័ត៌មាន",
       back: "ត្រឡប់",
+      image: "រូបភាពមុខម្ហូប",
+      imagePreviewAlt: "មើលរូបភាពមុខម្ហូបដែលបានជ្រើស",
       name: "ឈ្មោះ",
       namePlaceholder: "ឧ. Latte",
       description: "ពិពណ៌នា",
