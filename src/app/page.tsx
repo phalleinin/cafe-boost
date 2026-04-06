@@ -6,16 +6,22 @@ export default function HomePage() {
       <style>{`
         @import url('https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,300;0,400;0,600;0,700;1,300;1,600&family=DM+Sans:wght@300;400;500&display=swap');
 
-        *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+        * { box-sizing: border-box; margin: 0; padding: 0; }
 
         .root {
           min-height: 100vh;
           background: #F7F3EE;
           font-family: 'DM Sans', sans-serif;
           overflow-x: hidden;
+          position: relative;
         }
 
-        /* ── NAV ── */
+        .content {
+          position: relative;
+          z-index: 1;
+        }
+
+        /* NAV */
         nav {
           display: flex;
           align-items: center;
@@ -47,13 +53,11 @@ export default function HomePage() {
           background: #C8873A;
           border-radius: 50%;
           box-shadow: 0 0 10px rgba(200,135,58,0.4);
-          flex-shrink: 0;
         }
 
         .nav-links {
           display: flex;
           gap: 8px;
-          align-items: center;
         }
 
         .nav-link {
@@ -67,7 +71,6 @@ export default function HomePage() {
           border-radius: 100px;
           border: 1px solid transparent;
           transition: all 0.2s;
-          white-space: nowrap;
         }
 
         .nav-link:hover {
@@ -80,6 +83,7 @@ export default function HomePage() {
           color: #C8873A;
           border-color: rgba(200,135,58,0.35);
           background: rgba(200,135,58,0.08);
+          font-weight: 500;
         }
 
         .nav-link.primary:hover {
@@ -87,13 +91,12 @@ export default function HomePage() {
           border-color: rgba(200,135,58,0.5);
         }
 
-        /* ── HERO ── */
+        /* HERO */
         .hero {
-          padding: 64px 24px 48px;
+          padding: 32px 80px;
           text-align: center;
-          max-width: 860px;
+          max-width: 900px;
           margin: 0 auto;
-          width: 100%;
         }
 
         .hero-badge {
@@ -117,7 +120,6 @@ export default function HomePage() {
           height: 5px;
           background: #C8873A;
           border-radius: 50%;
-          flex-shrink: 0;
           animation: pulse 2s infinite;
         }
 
@@ -128,7 +130,7 @@ export default function HomePage() {
 
         .hero-title {
           font-family: 'Cormorant Garamond', serif;
-          font-size: clamp(44px, 8vw, 96px);
+          font-size: clamp(52px, 9vw, 96px);
           font-weight: 300;
           color: #1A0F00;
           line-height: 1.0;
@@ -144,7 +146,7 @@ export default function HomePage() {
         }
 
         .hero-sub {
-          font-size: clamp(14px, 2vw, 16px);
+          font-size: 16px;
           color: rgba(26,15,0,0.45);
           font-weight: 300;
           line-height: 1.7;
@@ -152,16 +154,16 @@ export default function HomePage() {
           margin: 16px auto 32px;
         }
 
-        /* ── FEATURE STRIP ── */
+        /* FEATURES STRIP */
         .strip {
           border-top: 1px solid rgba(200,135,58,0.15);
           border-bottom: 1px solid rgba(200,135,58,0.15);
           background: #ffffff;
-          padding: 16px 24px;
+          padding: 16px 48px;
           display: flex;
           align-items: center;
           justify-content: center;
-          gap: 32px;
+          gap: 48px;
           flex-wrap: wrap;
         }
 
@@ -172,21 +174,18 @@ export default function HomePage() {
           font-size: 12px;
           color: rgba(26,15,0,0.4);
           letter-spacing: 0.06em;
-          white-space: nowrap;
         }
 
         .strip-icon {
           color: #C8873A;
           font-size: 14px;
-          flex-shrink: 0;
         }
 
-        /* ── ROLE CARDS ── */
+        /* ROLE CARDS */
         .cards-section {
-          padding: 48px 24px 80px;
+          padding: 0 48px 100px;
           max-width: 900px;
           margin: 0 auto;
-          width: 100%;
         }
 
         .cards-label {
@@ -196,7 +195,7 @@ export default function HomePage() {
           letter-spacing: 0.2em;
           text-transform: uppercase;
           color: rgba(26,15,0,0.25);
-          margin-bottom: 28px;
+          margin-bottom: 32px;
         }
 
         .cards-grid {
@@ -210,7 +209,7 @@ export default function HomePage() {
           background: #ffffff;
           border: 1px solid rgba(200,135,58,0.15);
           border-radius: 24px;
-          padding: 36px 32px;
+          padding: 40px 36px;
           text-decoration: none;
           display: block;
           overflow: hidden;
@@ -241,7 +240,9 @@ export default function HomePage() {
           box-shadow: 0 20px 48px rgba(200,135,58,0.1);
         }
 
-        .role-card:hover::before { opacity: 1; }
+        .role-card:hover::before {
+          opacity: 1;
+        }
 
         .role-card-inner {
           position: relative;
@@ -249,15 +250,14 @@ export default function HomePage() {
         }
 
         .role-icon-wrap {
-          width: 52px;
-          height: 52px;
-          border-radius: 14px;
+          width: 56px;
+          height: 56px;
+          border-radius: 16px;
           display: flex;
           align-items: center;
           justify-content: center;
-          font-size: 24px;
-          margin-bottom: 20px;
-          flex-shrink: 0;
+          font-size: 26px;
+          margin-bottom: 24px;
         }
 
         .owner .role-icon-wrap {
@@ -272,7 +272,7 @@ export default function HomePage() {
 
         .role-title {
           font-family: 'Cormorant Garamond', serif;
-          font-size: clamp(22px, 3vw, 28px);
+          font-size: 28px;
           font-weight: 600;
           color: #1A0F00;
           margin-bottom: 10px;
@@ -284,12 +284,12 @@ export default function HomePage() {
           color: rgba(26,15,0,0.45);
           line-height: 1.65;
           font-weight: 300;
-          margin-bottom: 24px;
+          margin-bottom: 32px;
         }
 
         .role-features {
           list-style: none;
-          margin-bottom: 28px;
+          margin-bottom: 32px;
           display: flex;
           flex-direction: column;
           gap: 8px;
@@ -310,7 +310,7 @@ export default function HomePage() {
           flex-shrink: 0;
         }
 
-        .owner .feature-dot  { background: #C8873A; }
+        .owner .feature-dot { background: #C8873A; }
         .barista .feature-dot { background: #B4641E; }
 
         .role-btn {
@@ -321,40 +321,48 @@ export default function HomePage() {
           font-weight: 500;
           letter-spacing: 0.1em;
           text-transform: uppercase;
-          padding: 11px 22px;
+          padding: 12px 24px;
           border-radius: 100px;
           border: 1px solid;
           transition: all 0.2s ease;
-          white-space: nowrap;
         }
 
-        .role-btn-arrow { transition: transform 0.2s ease; }
-        .role-card:hover .role-btn-arrow { transform: translateX(5px); }
+        .role-btn-arrow {
+          transition: transform 0.2s ease;
+        }
+
+        .role-card:hover .role-btn-arrow {
+          transform: translateX(5px);
+        }
 
         .owner .role-btn {
           color: #C8873A;
           border-color: rgba(200,135,58,0.35);
           background: rgba(200,135,58,0.08);
         }
-        .owner:hover .role-btn { background: rgba(200,135,58,0.16); }
+
+        .owner:hover .role-btn {
+          background: rgba(200,135,58,0.16);
+        }
 
         .barista .role-btn {
           color: #B4641E;
           border-color: rgba(180,100,30,0.35);
           background: rgba(180,100,30,0.08);
         }
-        .barista:hover .role-btn { background: rgba(180,100,30,0.16); }
 
-        /* ── FOOTER ── */
+        .barista:hover .role-btn {
+          background: rgba(180,100,30,0.16);
+        }
+
+        /* FOOTER */
         footer {
-          padding: 20px 24px;
+          padding: 24px 48px;
           border-top: 1px solid rgba(200,135,58,0.12);
           background: #ffffff;
           display: flex;
           align-items: center;
           justify-content: space-between;
-          flex-wrap: wrap;
-          gap: 8px;
         }
 
         .footer-logo {
@@ -370,152 +378,67 @@ export default function HomePage() {
           letter-spacing: 0.05em;
         }
 
-        /* ── RESPONSIVE ── */
-
-        /* tablet */
-        @media (max-width: 768px) {
-          nav { padding: 16px 24px; }
-
-          .hero { padding: 48px 24px 40px; }
-
-          .cards-section { padding: 36px 24px 60px; }
-
-          .cards-grid {
-            grid-template-columns: 1fr 1fr;
-            gap: 14px;
-          }
-
-          .role-card { padding: 28px 22px; }
-        }
-
-        /* large mobile */
-        @media (max-width: 600px) {
-          nav { padding: 14px 16px; }
-          .nav-links { gap: 4px; }
-          .nav-link { padding: 7px 12px; font-size: 11px; }
-
-          .hero { padding: 40px 16px 32px; }
-
-          .strip { gap: 16px; padding: 14px 16px; }
-          .strip-item { font-size: 11px; }
-
-          .cards-section { padding: 28px 16px 48px; }
-
-          /* ✅ stack cards on small screens */
+        @media (max-width: 680px) {
+          nav { padding: 16px 20px; }
+          .nav-links { display: none; }
+          .hero { padding: 60px 24px 60px; }
+          .cards-section { padding: 0 24px 60px; }
           .cards-grid { grid-template-columns: 1fr; }
-
-          .role-card { padding: 28px 24px; border-radius: 18px; }
-          .role-card:hover { transform: none; }
-
-          footer { padding: 16px; }
-          .footer-copy { display: none; }
-        }
-
-        /* very small screens */
-        @media (max-width: 380px) {
-          .nav-link:not(.primary) { display: none; }
-          .hero-badge { font-size: 10px; letter-spacing: 0.12em; }
+          .strip { padding: 20px 24px; gap: 24px; }
+          footer { padding: 20px 24px; }
         }
       `}</style>
 
       <div className="root">
-
-        {/* Nav */}
-        <nav>
-          <span className="nav-logo">
-            <span className="nav-dot" />
-            CafeBoost
-          </span>
-          <div className="nav-links">
-            <Link href="/auth/signin" className="nav-link">Sign In</Link>
-            <Link href="/auth/signup" className="nav-link primary">Get Started</Link>
-          </div>
-        </nav>
-
-        {/* Hero */}
-        <section className="hero">
-          <div className="hero-badge">
-            <span className="hero-badge-dot" />
-            Smart QR Ordering System
-          </div>
-          <h1 className="hero-title">
-            Your Café,
-            <span className="hero-title-accent">Reimagined.</span>
-          </h1>
-          <p className="hero-sub">
-            CafeBoost brings your café into the digital age — QR menus, real-time orders,
-            and powerful analytics, all in one place.
-          </p>
-        </section>
-
-        {/* Feature strip */}
-        <div className="strip">
-          {[
-            { icon: "◈", label: "QR Menu Ordering" },
-            { icon: "◎", label: "Real-time Order Queue" },
-            { icon: "◉", label: "Sales Analytics" },
-          ].map((f) => (
-            <div key={f.label} className="strip-item">
-              <span className="strip-icon">{f.icon}</span>
-              {f.label}
+        <div className="content">
+          {/* Nav */}
+          <nav>
+            <span className="nav-logo">
+              <span className="nav-dot" />
+              CafeBoost
+            </span>
+            <div className="nav-links">
+              {/* ✅ Added className to fix hover and color */}
+              <Link href="/auth/signin" className="nav-link">Sign In</Link>
+              <Link href="/auth/signup" className="nav-link primary">Get Started</Link>
             </div>
-          ))}
-        </div>
+          </nav>
 
-        {/* Role cards */}
-        <section className="cards-section">
-          <p className="cards-label">Choose your role</p>
-          <div className="cards-grid">
+          {/* Hero */}
+          <section className="hero">
+            <div className="hero-badge">
+              <span className="hero-badge-dot" />
+              Smart QR Ordering System
+            </div>
+            <h1 className="hero-title">
+              Your Café,
+              <span className="hero-title-accent">Reimagined.</span>
+            </h1>
+            <p className="hero-sub">
+              CafeBoost brings your café into the digital age — QR menus, real-time orders, and powerful analytics, all in one place.
+            </p>
+          </section>
 
-            <Link href="/auth/signin?role=owner" className="role-card owner">
-              <div className="role-card-inner">
-                <div className="role-icon-wrap">☕</div>
-                <h2 className="role-title">Café Owner</h2>
-                <p className="role-desc">
-                  Manage your menu, track orders in real-time, and view sales analytics all from one dashboard.
-                </p>
-                <ul className="role-features">
-                  <li><span className="feature-dot" />Menu management</li>
-                  <li><span className="feature-dot" />Live order dashboard</li>
-                  <li><span className="feature-dot" />Sales analytics</li>
-                  <li><span className="feature-dot" />QR code generation</li>
-                </ul>
-                <span className="role-btn">
-                  Owner Portal
-                  <span className="role-btn-arrow">→</span>
-                </span>
+          {/* Feature strip */}
+          <div className="strip">
+            {[
+              { icon: "◈", label: "QR Menu Ordering" },
+              { icon: "◎", label: "Real-time Order Queue" },
+              { icon: "◉", label: "Sales Analytics" },
+            ].map((f) => (
+              <div key={f.label} className="strip-item">
+                <span className="strip-icon">{f.icon}</span>
+                {f.label}
               </div>
-            </Link>
-
-            <Link href="/auth/signin?role=barista" className="role-card barista">
-              <div className="role-card-inner">
-                <div className="role-icon-wrap">🫖</div>
-                <h2 className="role-title">Barista</h2>
-                <p className="role-desc">
-                  View and manage your queue, update order statuses, and keep service running smoothly.
-                </p>
-                <ul className="role-features">
-                  <li><span className="feature-dot" />Live order queue</li>
-                  <li><span className="feature-dot" />Status updates</li>
-                  <li><span className="feature-dot" />Order history</li>
-                  <li><span className="feature-dot" />Instant notifications</li>
-                </ul>
-                <span className="role-btn">
-                  Staff Portal
-                  <span className="role-btn-arrow">→</span>
-                </span>
-              </div>
-            </Link>
-
+            ))}
           </div>
-        </section>
 
-        {/* Footer */}
-        <footer>
-          <span className="footer-logo">CafeBoost</span>
-          <span className="footer-copy">© {new Date().getFullYear()} · Built for modern cafés</span>
-        </footer>
-
+          {/* Footer */}
+          <footer>
+            <span className="footer-logo">CafeBoost</span>
+            <span className="footer-copy">© {new Date().getFullYear()} · Built for modern cafés</span>
+          </footer>
+        </div>
       </div>
     </>
   );

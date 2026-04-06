@@ -72,7 +72,9 @@ export default function PaymentPage() {
 
       localStorage.removeItem("cart");
       setCart([]);
-      router.push(`/qr/cafes/${cafeId}/confirmation`);
+
+      // ✅ Fixed: use orderId (not newOrderId)
+      router.push(`/qr/cafes/${cafeId}/confirmation?order_id=${orderId}`);
     } catch (err) {
       console.error("FULL ERROR:", JSON.stringify(err, null, 2));
       alert("Failed to place order. Please try again.");

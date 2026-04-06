@@ -18,6 +18,7 @@ type OrderStatus = "pending" | "preparing" | "completed";
 
 type Order = {
   id: string;
+  order_number: number | null; // ✅ CHANGE 1: added order_number to type
   customer_name: string | null;
   status: OrderStatus;
   payment_method: string;
@@ -26,8 +27,9 @@ type Order = {
   order_items: OrderItem[];
 };
 
+// ✅ CHANGE 2: added order_number to SELECT_QUERY
 const SELECT_QUERY = `
-  id, customer_name, status, payment_method, total, created_at,
+  id, order_number, customer_name, status, payment_method, total, created_at,
   order_items!order_items_order_id_fkey (
     id, menu_id, quantity, unit_price, notes,
     menus ( name )
@@ -477,6 +479,19 @@ export default function OwnerDashboardPage() {
 
         .ocard-left { min-width: 0; flex: 1; }
 
+        /* ✅ CHANGE 3: order number badge style */
+        .ocard-number {
+          font-size: 11px;
+          font-weight: 700;
+          color: #ffffff;
+          background: #C8873A;
+          border-radius: 6px;
+          padding: 2px 8px;
+          letter-spacing: 0.04em;
+          display: inline-block;
+          margin-bottom: 4px;
+        }
+
         .ocard-name {
           font-size: 14px;
           font-weight: 500;
@@ -788,6 +803,12 @@ function OrderCard({
     <div className={`ocard ${order.status}`}>
       <div className="ocard-top">
         <div className="ocard-left">
+          {/* ✅ CHANGE 4: show order number badge above customer name */}
+          {order.order_number != null && (
+            <span className="ocard-number">
+              #{String(order.order_number).padStart(3, "0")}
+            </span>
+          )}
           <p className={`ocard-name ${isGuest ? "guest" : ""}`}>
             {guestName(order.customer_name)}
           </p>

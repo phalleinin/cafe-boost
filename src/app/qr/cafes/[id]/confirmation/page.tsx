@@ -1,16 +1,48 @@
 "use client";
 
-import { useParams, useRouter } from "next/navigation";
+import { useEffect, useState } from "react";
+import { useParams, useRouter, useSearchParams } from "next/navigation";
+import { supabase } from "@/lib/supabase/client";
 
 export default function ConfirmationPage() {
   const params = useParams();
   const router = useRouter();
+  const searchParams = useSearchParams();
   const cafeId = typeof params?.id === "string" ? params.id : undefined;
+
+  // order_id is passed as a query param from the checkout page: ?order_id=xxx
+  const orderId = searchParams.get("order_id");
+
+  const [orderNumber, setOrderNumber] = useState<number | null>(null);
+  const [loadingNumber, setLoadingNumber] = useState(true);
+
+  useEffect(() => {
+    if (!orderId) { setLoadingNumber(false); return; }
+
+    const fetch = async () => {
+      const { data } = await supabase
+        .from("orders")
+        .select("order_number")
+        .eq("id", orderId)
+        .single();
+
+      setOrderNumber(data?.order_number ?? null);
+      setLoadingNumber(false);
+    };
+
+    void fetch();
+  }, [orderId]);
+
+  const formattedNumber = orderNumber != null
+    ? `#${String(orderNumber).padStart(3, "0")}`
+    : null;
 
   return (
     <>
       <style>{`
         @import url('https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@300;600&family=DM+Sans:wght@300;400;500&display=swap');
+
+        * { box-sizing: border-box; margin: 0; padding: 0; }
 
         .confirm-root {
           min-height: 100vh;
@@ -34,7 +66,7 @@ export default function ConfirmationPage() {
           display: flex;
           align-items: center;
           gap: 7px;
-          margin-bottom: 48px;
+          margin-bottom: 40px;
         }
 
         .logo-dot {
@@ -49,8 +81,8 @@ export default function ConfirmationPage() {
           background: #ffffff;
           border: 1px solid rgba(200,135,58,0.15);
           border-radius: 24px;
-          padding: 48px 40px;
-          max-width: 400px;
+          padding: 40px 32px;
+          max-width: 380px;
           width: 100%;
           box-shadow: 0 4px 24px rgba(0,0,0,0.06);
           display: flex;
@@ -58,50 +90,103 @@ export default function ConfirmationPage() {
           align-items: center;
         }
 
+        /* success checkmark */
         .confirm-icon {
-          width: 64px;
-          height: 64px;
+          width: 56px;
+          height: 56px;
           background: rgba(40,160,90,0.1);
           border: 1px solid rgba(40,160,90,0.2);
           border-radius: 50%;
           display: flex;
           align-items: center;
           justify-content: center;
-          font-size: 28px;
-          margin-bottom: 24px;
+          font-size: 24px;
+          margin-bottom: 16px;
+          color: #1A8A50;
         }
 
         .confirm-title {
           font-family: 'Cormorant Garamond', serif;
-          font-size: 30px;
+          font-size: 26px;
           font-weight: 600;
           color: #1A0F00;
-          margin-bottom: 10px;
+          margin-bottom: 6px;
         }
 
         .confirm-sub {
           font-size: 13px;
-          color: rgba(26,15,0,0.45);
+          color: rgba(26,15,0,0.4);
           font-weight: 300;
-          line-height: 1.7;
-          margin-bottom: 32px;
-          max-width: 280px;
+          line-height: 1.6;
+          margin-bottom: 28px;
+        }
+
+        /* order number block — the hero element */
+        .order-number-block {
+          background: #1A0F00;
+          border-radius: 16px;
+          padding: 24px 32px;
+          width: 100%;
+          margin-bottom: 24px;
+          display: flex;
+          flex-direction: column;
+          align-items: center;
+          gap: 4px;
+        }
+
+        .order-number-label {
+          font-size: 10px;
+          font-weight: 600;
+          letter-spacing: 0.2em;
+          text-transform: uppercase;
+          color: rgba(255,255,255,0.4);
+        }
+
+        .order-number-value {
+          font-family: 'Cormorant Garamond', serif;
+          font-size: 64px;
+          font-weight: 600;
+          color: #C8873A;
+          line-height: 1;
+          letter-spacing: -0.02em;
+        }
+
+        .order-number-hint {
+          font-size: 11px;
+          color: rgba(255,255,255,0.3);
+          margin-top: 4px;
+        }
+
+        /* skeleton while loading */
+        .order-number-skeleton {
+          width: 120px;
+          height: 64px;
+          background: rgba(255,255,255,0.08);
+          border-radius: 8px;
+          animation: shimmer 1.2s ease-in-out infinite;
+        }
+
+        @keyframes shimmer {
+          0%,100% { opacity: 0.4; }
+          50% { opacity: 0.8; }
         }
 
         .divider {
           width: 100%;
           height: 1px;
           background: rgba(200,135,58,0.1);
-          margin-bottom: 24px;
+          margin-bottom: 20px;
         }
 
+        /* live status */
         .status-row {
           display: flex;
           align-items: center;
           gap: 10px;
           font-size: 13px;
           color: rgba(26,15,0,0.5);
-          margin-bottom: 32px;
+          margin-bottom: 24px;
+          text-align: left;
         }
 
         .status-dot {
@@ -118,6 +203,7 @@ export default function ConfirmationPage() {
           50% { opacity: 0.4; transform: scale(0.85); }
         }
 
+        /* buttons */
         .back-btn {
           width: 100%;
           padding: 13px;
@@ -133,7 +219,7 @@ export default function ConfirmationPage() {
           box-shadow: 0 4px 14px rgba(200,135,58,0.25);
           letter-spacing: 0.06em;
           text-transform: uppercase;
-          margin-bottom: 12px;
+          margin-bottom: 10px;
         }
 
         .back-btn:hover {
@@ -162,30 +248,40 @@ export default function ConfirmationPage() {
       `}</style>
 
       <div className="confirm-root">
-        {/* Logo */}
         <div className="confirm-logo">
           <span className="logo-dot" />
           CafeBoost
         </div>
 
         <div className="confirm-card">
-          {/* Success icon */}
           <div className="confirm-icon">✓</div>
-
           <h1 className="confirm-title">Order Placed!</h1>
           <p className="confirm-sub">
-            Your order has been received. Please wait.
+            Your order has been received.<br />Remember your order number below.
           </p>
+
+          {/* ── Order number — hero element ── */}
+          <div className="order-number-block">
+            <p className="order-number-label">Your Order Number</p>
+            {loadingNumber ? (
+              <div className="order-number-skeleton" />
+            ) : formattedNumber ? (
+              <p className="order-number-value">{formattedNumber}</p>
+            ) : (
+              <p className="order-number-value" style={{ fontSize: "32px", color: "rgba(255,255,255,0.3)" }}>
+                —
+              </p>
+            )}
+            <p className="order-number-hint">We will call this number when ready</p>
+          </div>
 
           <div className="divider" />
 
-          {/* Live status indicator */}
           <div className="status-row">
             <span className="status-dot" />
-            Your order is being prepared. Thank you!!
+            Your order is being prepared. Thank you!
           </div>
 
-          {/* Back to menu */}
           <button
             onClick={() => router.push(`/qr/cafes/${cafeId}/menu`)}
             className="back-btn"
