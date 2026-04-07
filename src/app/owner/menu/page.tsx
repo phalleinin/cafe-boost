@@ -1,17 +1,21 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { supabase } from "@/lib/supabase/client";
 import { uploadMenuImage } from "@/lib/uploadImage";
 import type { MenuItem } from "@/types/menu";
 import Link from "next/link";
 import { useLocale } from "@/i18n/locale-context";
 
+type MenuCategory = "hot" | "cold" | "frappe";
+
 export default function OwnerMenuPage() {
   const { t } = useLocale();
 
   const [cafeId, setCafeId] = useState<string | null>(null);
   const [menu, setMenu] = useState<MenuItem[]>([]);
+  const [filteredMenu, setFilteredMenu] = useState<MenuItem[]>([]);
+  const [search, setSearch] = useState("");
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [editingItem, setEditingItem] = useState<MenuItem | null>(null);
@@ -49,7 +53,9 @@ export default function OwnerMenuPage() {
 
         setCafeId(profile.cafe_id);
       } catch (err) {
-        setError(err instanceof Error ? err.message : t.menu.failedToLoadProfile);
+        setError(
+          err instanceof Error ? err.message : t.menu.failedToLoadProfile
+        );
         setLoading(false);
       }
     };
@@ -75,7 +81,12 @@ export default function OwnerMenuPage() {
           .order("price", { ascending: true });
 
         if (error) throw error;
-        if (!cancelled) setMenu(data || []);
+
+        if (!cancelled) {
+          const menuData = data || [];
+          setMenu(menuData);
+          setFilteredMenu(menuData);
+        }
       } catch (err) {
         if (!cancelled) {
           setError(err instanceof Error ? err.message : t.menu.errorLoadingMenu);
@@ -93,12 +104,67 @@ export default function OwnerMenuPage() {
   }, [cafeId, t.menu.errorLoadingMenu]);
 
   useEffect(() => {
+    const normalizedSearch = search.trim().toLowerCase();
+
+    if (!normalizedSearch) {
+      setFilteredMenu(menu);
+      return;
+    }
+
+    const filtered = menu.filter((item) =>
+      item.name.toLowerCase().includes(normalizedSearch)
+    );
+
+    setFilteredMenu(filtered);
+  }, [search, menu]);
+
+  useEffect(() => {
     return () => {
       if (editPreview && editPreview.startsWith("blob:")) {
         URL.revokeObjectURL(editPreview);
       }
     };
   }, [editPreview]);
+
+  const getItemCategory = (item: MenuItem): MenuCategory | "" => {
+    const rawCategory = (
+      item as MenuItem & { category?: string | null }
+    ).category;
+
+    if (!rawCategory) return "";
+
+    const normalized = rawCategory.toLowerCase();
+
+    if (
+      normalized === "hot" ||
+      normalized === "cold" ||
+      normalized === "frappe"
+    ) {
+      return normalized;
+    }
+
+    return "";
+  };
+
+  const hotItems = useMemo(
+    () => filteredMenu.filter((item) => getItemCategory(item) === "hot"),
+    [filteredMenu]
+  );
+
+  const coldItems = useMemo(
+    () => filteredMenu.filter((item) => getItemCategory(item) === "cold"),
+    [filteredMenu]
+  );
+
+  const frappeItems = useMemo(
+    () => filteredMenu.filter((item) => getItemCategory(item) === "frappe"),
+    [filteredMenu]
+  );
+
+  const uncategorizedItems = useMemo(
+    () => filteredMenu.filter((item) => getItemCategory(item) === ""),
+    [filteredMenu]
+  );
 
   const handleToggleAvailability = async (item: MenuItem) => {
     setTogglingId(item.id);
@@ -157,12 +223,17 @@ export default function OwnerMenuPage() {
         image_url: imageUrl,
       };
 
+      const updatedCategory =
+        ((updatedItem as MenuItem & { category?: MenuCategory }).category ??
+          "cold");
+
       const { error } = await supabase
         .from("menus")
         .update({
           name: updatedItem.name,
           description: updatedItem.description,
           price: updatedItem.price,
+          category: updatedCategory,
           is_available: updatedItem.is_available,
           image_url: updatedItem.image_url,
         })
@@ -175,7 +246,11 @@ export default function OwnerMenuPage() {
       }
 
       setMenu((prev) =>
-        prev.map((m) => (m.id === updatedItem.id ? updatedItem : m))
+        prev.map((m) =>
+          m.id === updatedItem.id
+            ? ({ ...updatedItem, category: updatedCategory } as MenuItem)
+            : m
+        )
       );
 
       if (editPreview && editPreview.startsWith("blob:")) {
@@ -201,6 +276,81 @@ export default function OwnerMenuPage() {
     setEditImage(null);
     setEditPreview(null);
   };
+
+  const renderMenuCards = (items: MenuItem[]) =>
+    items.map((item) => (
+      <div key={item.id} className="menu-card">
+        {item.image_url ? (
+          <div className="image-wrapper">
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img
+              src={item.image_url}
+              alt={item.name}
+              className="item-image"
+            />
+            <div className="image-overlay" />
+          </div>
+        ) : (
+          <div className="item-image-fallback">No Image</div>
+        )}
+
+        {!item.is_available && (
+          <span
+            className={`unavailable-badge ${
+              t.meta.isKhmer ? "khmer-text" : ""
+            }`}
+          >
+            {t.menu.unavailable}
+          </span>
+        )}
+
+        <h3 className="item-name">{item.name}</h3>
+        <p className={`item-desc ${t.meta.isKhmer ? "khmer-text" : ""}`}>
+          {item.description || t.menu.noDescription}
+        </p>
+        <p className="item-price">${item.price.toFixed(2)}</p>
+
+        <div className="card-actions">
+          <button
+            onClick={() => {
+              setEditingItem({
+                ...item,
+                category:
+                  ((item as MenuItem & { category?: MenuCategory }).category ??
+                    "cold"),
+              } as MenuItem);
+              setEditImage(null);
+              setEditPreview(item.image_url || null);
+            }}
+            className="btn btn-edit"
+          >
+            {t.menu.actions.edit}
+          </button>
+
+          <button
+            onClick={() => handleDelete(item.id)}
+            disabled={deletingId === item.id}
+            className="btn btn-delete"
+          >
+            {deletingId === item.id
+              ? t.menu.actions.deleting
+              : t.menu.actions.delete}
+          </button>
+
+          <button
+            onClick={() => handleToggleAvailability(item)}
+            disabled={togglingId === item.id}
+            className="btn btn-toggle"
+          >
+            {togglingId === item.id
+              ? t.menu.actions.updating
+              : item.is_available
+                ? t.menu.actions.markUnavailable
+                : t.menu.actions.markAvailable}
+          </button>
+        </div>
+      </div>
+    ));
 
   return (
     <>
@@ -240,6 +390,30 @@ export default function OwnerMenuPage() {
           font-weight: 300;
         }
 
+        .search-input {
+          width: 100%;
+          max-width: 520px;
+          padding: 14px 20px;
+          border-radius: 999px;
+          border: 1px solid rgba(200,135,58,0.2);
+          font-size: 15px;
+          font-family: 'DM Sans', 'Noto Sans Khmer', sans-serif;
+          background: #ffffff;
+          color: #1A0F00;
+          outline: none;
+          margin-bottom: 12px;
+          transition: border-color 0.2s, box-shadow 0.2s;
+        }
+
+        .search-input:focus {
+          border-color: rgba(200,135,58,0.45);
+          box-shadow: 0 0 0 3px rgba(200,135,58,0.08);
+        }
+
+        .search-input::placeholder {
+          color: rgba(26,15,0,0.30);
+        }
+
         .add-btn {
           display: inline-flex;
           align-items: center;
@@ -275,6 +449,19 @@ export default function OwnerMenuPage() {
           border: 1px solid rgba(220,50,50,0.15);
           padding: 12px 16px;
           border-radius: 12px;
+          margin-bottom: 18px;
+        }
+
+        .category-section {
+          margin-bottom: 40px;
+        }
+
+        .category-title {
+          font-family: 'Cormorant Garamond', serif;
+          font-size: 40px;
+          line-height: 1;
+          font-weight: 600;
+          color: #1A0F00;
           margin-bottom: 18px;
         }
 
@@ -505,11 +692,12 @@ export default function OwnerMenuPage() {
           inset: 0;
           background: rgba(26,15,0,0.4);
           display: flex;
-          align-items: center;
+          align-items: flex-start;
           justify-content: center;
           z-index: 50;
           padding: 24px;
           backdrop-filter: blur(4px);
+          overflow-y: auto;
         }
 
         .modal-card {
@@ -518,8 +706,13 @@ export default function OwnerMenuPage() {
           padding: 32px;
           width: 100%;
           max-width: 520px;
+          max-height: calc(100vh - 48px);
+          overflow-y: auto;
           box-shadow: 0 28px 80px rgba(0,0,0,0.14);
           border: 1px solid rgba(200,135,58,0.12);
+          margin: 0 auto;
+          scrollbar-width: thin;
+          padding-right: 24px;
         }
 
         .modal-title {
@@ -578,11 +771,46 @@ export default function OwnerMenuPage() {
           padding: 12px;
         }
 
+        .category-grid {
+          display: grid;
+          grid-template-columns: repeat(3, minmax(0, 1fr));
+          gap: 10px;
+          margin-bottom: 18px;
+        }
+
+        .category-option {
+          border: 1px solid rgba(200,135,58,0.16);
+          background: #fff;
+          color: #1A0F00;
+          border-radius: 16px;
+          padding: 14px 12px;
+          cursor: pointer;
+          transition: all 0.2s ease;
+          text-align: center;
+          font-size: 14px;
+          font-weight: 600;
+          font-family: 'DM Sans', 'Noto Sans Khmer', sans-serif;
+        }
+
+        .category-option:hover {
+          border-color: rgba(200,135,58,0.4);
+          background: #fffaf4;
+        }
+
+        .category-option.active {
+          background: rgba(200,135,58,0.10);
+          border-color: #C8873A;
+          color: #C8873A;
+          box-shadow: 0 0 0 3px rgba(200,135,58,0.08);
+        }
+
         .modal-actions {
           display: flex;
           justify-content: flex-end;
           gap: 8px;
-          margin-top: 8px;
+          margin-top: 18px;
+          padding-top: 8px;
+          background: #ffffff;
         }
 
         .modal-cancel {
@@ -625,14 +853,59 @@ export default function OwnerMenuPage() {
           opacity: 0.5;
           cursor: not-allowed;
         }
-      `}</style>
 
+        @media (max-width: 640px) {
+          .menu-header {
+            align-items: stretch;
+          }
+
+          .search-input {
+            max-width: none;
+          }
+
+          .category-title {
+            font-size: 34px;
+          }
+
+          .menu-grid {
+            grid-template-columns: 1fr;
+          }
+
+          .modal-overlay {
+            padding: 12px;
+          }
+
+          .modal-card {
+            padding: 20px;
+            padding-right: 16px;
+            border-radius: 22px;
+            max-height: calc(100vh - 24px);
+          }
+
+          .category-grid {
+            grid-template-columns: 1fr;
+          }
+
+          .modal-actions {
+            flex-direction: column-reverse;
+          }
+
+          .modal-cancel,
+          .modal-save {
+            width: 100%;
+          }
+        }
+      `}</style>
       <div className="menu-root">
         <div className="menu-header">
           <div>
-            <h1 className={`menu-title ${t.meta.isKhmer ? "khmer-text" : ""}`}>
-              {t.menu.title}
-            </h1>
+            <input
+              type="text"
+              placeholder="Search drinks..."
+              className={`search-input ${t.meta.isKhmer ? "khmer-text" : ""}`}
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+            />
             <p className={`menu-sub ${t.meta.isKhmer ? "khmer-text" : ""}`}>
               {t.menu.subtitle}
             </p>
@@ -661,73 +934,68 @@ export default function OwnerMenuPage() {
           </p>
         )}
 
-        {!loading && !error && menu.length > 0 && (
-          <div className="menu-grid">
-            {menu.map((item) => (
-              <div key={item.id} className="menu-card">
-                {item.image_url ? (
-                  <div className="image-wrapper">
-                    {/* eslint-disable-next-line @next/next/no-img-element */}
-                    <img
-                      src={item.image_url}
-                      alt={item.name}
-                      className="item-image"
-                    />
-                    <div className="image-overlay" />
-                  </div>
-                ) : (
-                  <div className="item-image-fallback">No Image</div>
-                )}
+        {!loading && !error && menu.length > 0 && filteredMenu.length === 0 && (
+          <p className={`status-msg ${t.meta.isKhmer ? "khmer-text" : ""}`}>
+            No drinks found.
+          </p>
+        )}
 
-                {!item.is_available && (
-                  <span className={`unavailable-badge ${t.meta.isKhmer ? "khmer-text" : ""}`}>
-                    {t.menu.unavailable}
-                  </span>
-                )}
+        {!loading && !error && filteredMenu.length > 0 && (
+          <>
+            {hotItems.length > 0 && (
+              <section className="category-section">
+                <h2
+                  className={`category-title ${
+                    t.meta.isKhmer ? "khmer-text" : ""
+                  }`}
+                >
+                  Hot Drinks
+                </h2>
+                <div className="menu-grid">{renderMenuCards(hotItems)}</div>
+              </section>
+            )}
 
-                <h3 className="item-name">{item.name}</h3>
-                <p className={`item-desc ${t.meta.isKhmer ? "khmer-text" : ""}`}>
-                  {item.description || t.menu.noDescription}
-                </p>
-                <p className="item-price">${item.price.toFixed(2)}</p>
+            {coldItems.length > 0 && (
+              <section className="category-section">
+                <h2
+                  className={`category-title ${
+                    t.meta.isKhmer ? "khmer-text" : ""
+                  }`}
+                >
+                  Cold Drinks
+                </h2>
+                <div className="menu-grid">{renderMenuCards(coldItems)}</div>
+              </section>
+            )}
 
-                <div className="card-actions">
-                  <button
-                    onClick={() => {
-                      setEditingItem(item);
-                      setEditImage(null);
-                      setEditPreview(item.image_url || null);
-                    }}
-                    className="btn btn-edit"
-                  >
-                    {t.menu.actions.edit}
-                  </button>
+            {frappeItems.length > 0 && (
+              <section className="category-section">
+                <h2
+                  className={`category-title ${
+                    t.meta.isKhmer ? "khmer-text" : ""
+                  }`}
+                >
+                  Frappe
+                </h2>
+                <div className="menu-grid">{renderMenuCards(frappeItems)}</div>
+              </section>
+            )}
 
-                  <button
-                    onClick={() => handleDelete(item.id)}
-                    disabled={deletingId === item.id}
-                    className="btn btn-delete"
-                  >
-                    {deletingId === item.id
-                      ? t.menu.actions.deleting
-                      : t.menu.actions.delete}
-                  </button>
-
-                  <button
-                    onClick={() => handleToggleAvailability(item)}
-                    disabled={togglingId === item.id}
-                    className="btn btn-toggle"
-                  >
-                    {togglingId === item.id
-                      ? t.menu.actions.updating
-                      : item.is_available
-                      ? t.menu.actions.markUnavailable
-                      : t.menu.actions.markAvailable}
-                  </button>
+            {uncategorizedItems.length > 0 && (
+              <section className="category-section">
+                <h2
+                  className={`category-title ${
+                    t.meta.isKhmer ? "khmer-text" : ""
+                  }`}
+                >
+                  Other Drinks
+                </h2>
+                <div className="menu-grid">
+                  {renderMenuCards(uncategorizedItems)}
                 </div>
-              </div>
-            ))}
-          </div>
+              </section>
+            )}
+          </>
         )}
 
         <div className="qr-section">
@@ -749,7 +1017,9 @@ export default function OwnerMenuPage() {
               {t.menu.modal.editTitle}
             </h2>
 
-            <label className={`modal-label ${t.meta.isKhmer ? "khmer-text" : ""}`}>
+            <label
+              className={`modal-label ${t.meta.isKhmer ? "khmer-text" : ""}`}
+            >
               Item Image
             </label>
             <input
@@ -814,6 +1084,67 @@ export default function OwnerMenuPage() {
                 setEditingItem({ ...editingItem, description: e.target.value })
               }
             />
+
+            <label
+              className={`modal-label ${t.meta.isKhmer ? "khmer-text" : ""}`}
+            >
+              Category
+            </label>
+            <div className="category-grid">
+              <button
+                type="button"
+                className={`category-option ${
+                  (((editingItem as MenuItem & { category?: MenuCategory })
+                    .category ?? "cold") === "hot")
+                    ? "active"
+                    : ""
+                }`}
+                onClick={() =>
+                  setEditingItem({
+                    ...editingItem,
+                    category: "hot",
+                  } as MenuItem)
+                }
+              >
+                Hot
+              </button>
+
+              <button
+                type="button"
+                className={`category-option ${
+                  (((editingItem as MenuItem & { category?: MenuCategory })
+                    .category ?? "cold") === "cold")
+                    ? "active"
+                    : ""
+                }`}
+                onClick={() =>
+                  setEditingItem({
+                    ...editingItem,
+                    category: "cold",
+                  } as MenuItem)
+                }
+              >
+                Cold
+              </button>
+
+              <button
+                type="button"
+                className={`category-option ${
+                  (((editingItem as MenuItem & { category?: MenuCategory })
+                    .category ?? "cold") === "frappe")
+                    ? "active"
+                    : ""
+                }`}
+                onClick={() =>
+                  setEditingItem({
+                    ...editingItem,
+                    category: "frappe",
+                  } as MenuItem)
+                }
+              >
+                Frappe
+              </button>
+            </div>
 
             <label
               htmlFor="edit-price"

@@ -7,6 +7,8 @@ import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { useLocale } from "@/i18n/locale-context";
 
+type MenuCategory = "hot" | "cold" | "frappe";
+
 export default function AddMenuItemPage() {
   const router = useRouter();
   const { t } = useLocale();
@@ -16,6 +18,7 @@ export default function AddMenuItemPage() {
   const [name, setName] = useState("");
   const [description, setDescription] = useState("");
   const [price, setPrice] = useState("");
+  const [category, setCategory] = useState<MenuCategory>("cold");
   const [isAvailable, setIsAvailable] = useState(true);
   const [image, setImage] = useState<File | null>(null);
   const [preview, setPreview] = useState<string | null>(null);
@@ -95,6 +98,7 @@ export default function AddMenuItemPage() {
         name: name.trim(),
         description: description.trim() || null,
         price: parseFloat(price),
+        category,
         is_available: isAvailable,
         image_url: imageUrl,
       });
@@ -328,6 +332,37 @@ export default function AddMenuItemPage() {
           pointer-events: none;
         }
 
+        .category-grid {
+          display: grid;
+          grid-template-columns: repeat(3, minmax(0, 1fr));
+          gap: 10px;
+        }
+
+        .category-option {
+          border: 1px solid rgba(200,135,58,0.16);
+          background: #fff;
+          color: #1A0F00;
+          border-radius: 16px;
+          padding: 14px 12px;
+          cursor: pointer;
+          transition: all 0.2s ease;
+          text-align: center;
+          font-size: 14px;
+          font-weight: 600;
+        }
+
+        .category-option:hover {
+          border-color: rgba(200,135,58,0.4);
+          background: #fffaf4;
+        }
+
+        .category-option.active {
+          background: rgba(200,135,58,0.10);
+          border-color: #C8873A;
+          color: #C8873A;
+          box-shadow: 0 0 0 3px rgba(200,135,58,0.08);
+        }
+
         .availability-row {
           display: flex;
           align-items: center;
@@ -430,6 +465,10 @@ export default function AddMenuItemPage() {
             height: 200px;
           }
 
+          .category-grid {
+            grid-template-columns: 1fr;
+          }
+
           .form-actions {
             flex-direction: column;
           }
@@ -529,6 +568,33 @@ export default function AddMenuItemPage() {
                     value={price}
                     onChange={(e) => setPrice(e.target.value)}
                   />
+                </div>
+
+                <div className="field-group">
+                  <label className="field-label">Category</label>
+                  <div className="category-grid">
+                    <button
+                      type="button"
+                      className={`category-option ${category === "hot" ? "active" : ""}`}
+                      onClick={() => setCategory("hot")}
+                    >
+                      Hot
+                    </button>
+                    <button
+                      type="button"
+                      className={`category-option ${category === "cold" ? "active" : ""}`}
+                      onClick={() => setCategory("cold")}
+                    >
+                      Cold
+                    </button>
+                    <button
+                      type="button"
+                      className={`category-option ${category === "frappe" ? "active" : ""}`}
+                      onClick={() => setCategory("frappe")}
+                    >
+                      Frappe
+                    </button>
+                  </div>
                 </div>
 
                 <div className="availability-row">

@@ -8,11 +8,33 @@ type MenuCardProps = {
   onAddToCart?: (item: MenuItem) => void;
 };
 
+type MenuCategory = "hot" | "cold" | "frappe";
+
 export default function MenuCard({
   item,
   isOrderEnabled = false,
   onAddToCart,
 }: MenuCardProps) {
+  const normalizedCategory = (
+    item as MenuItem & { category?: string | null }
+  ).category?.toLowerCase();
+
+  const category =
+    normalizedCategory === "hot" ||
+    normalizedCategory === "cold" ||
+    normalizedCategory === "frappe"
+      ? (normalizedCategory as MenuCategory)
+      : null;
+
+  const categoryLabel =
+    category === "hot"
+      ? "Hot"
+      : category === "cold"
+        ? "Cold"
+        : category === "frappe"
+          ? "Frappe"
+          : null;
+
   return (
     <>
       <style>{`
@@ -75,6 +97,40 @@ export default function MenuCard({
           color: rgba(26, 15, 0, 0.34);
           font-size: 13px;
           margin-bottom: 16px;
+        }
+
+        .qr-menu-category {
+          display: inline-flex;
+          align-items: center;
+          align-self: flex-start;
+          margin-bottom: 10px;
+          padding: 6px 12px;
+          border-radius: 999px;
+          font-size: 11px;
+          font-weight: 700;
+          letter-spacing: 0.08em;
+          text-transform: uppercase;
+          border: 1px solid rgba(200, 135, 58, 0.14);
+          background: rgba(200, 135, 58, 0.08);
+          color: #A76C27;
+        }
+
+        .qr-menu-category.hot {
+          background: rgba(200, 80, 40, 0.10);
+          border-color: rgba(200, 80, 40, 0.16);
+          color: #B14D2F;
+        }
+
+        .qr-menu-category.cold {
+          background: rgba(70, 120, 200, 0.10);
+          border-color: rgba(70, 120, 200, 0.16);
+          color: #3B6CB7;
+        }
+
+        .qr-menu-category.frappe {
+          background: rgba(120, 90, 180, 0.10);
+          border-color: rgba(120, 90, 180, 0.16);
+          color: #6E4DB0;
         }
 
         .qr-menu-name {
@@ -161,6 +217,12 @@ export default function MenuCard({
           </div>
         ) : (
           <div className="qr-menu-image-fallback">No Image</div>
+        )}
+
+        {categoryLabel && (
+          <div className={`qr-menu-category ${category}`}>
+            {categoryLabel}
+          </div>
         )}
 
         <h3 className="qr-menu-name">{item.name}</h3>
