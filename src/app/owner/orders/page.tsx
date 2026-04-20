@@ -23,6 +23,16 @@ type Order = {
   order_items: OrderItem[];
 };
 
+function isToday(dateStr: string): boolean {
+  const d = new Date(dateStr);
+  const now = new Date();
+  return (
+    d.getFullYear() === now.getFullYear() &&
+    d.getMonth() === now.getMonth() &&
+    d.getDate() === now.getDate()
+  );
+}
+
 export default function OwnerOrdersPage() {
   const { t } = useLocale();
 
@@ -121,6 +131,7 @@ export default function OwnerOrdersPage() {
 
       if (error) throw error;
 
+      // Update order status instantly in local state
       setOrders((prev) =>
         prev.map((o) => (o.id === orderId ? { ...o, status: newStatus } : o))
       );
@@ -172,7 +183,11 @@ export default function OwnerOrdersPage() {
   const completedOrders = orders.filter((o) => o.status === "completed");
   const pendingCount = orders.filter((o) => o.status === "pending").length;
   const preparingCount = orders.filter((o) => o.status === "preparing").length;
-  const todayRevenue = completedOrders.reduce((s, o) => s + o.total, 0);
+
+  // Only sum today's completed orders
+  const todayRevenue = orders
+    .filter((o) => o.status === "completed" && isToday(o.created_at))
+    .reduce((s, o) => s + o.total, 0);
 
   const filteredOrders =
     filterStatus === "active"

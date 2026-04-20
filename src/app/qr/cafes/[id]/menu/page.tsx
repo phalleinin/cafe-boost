@@ -18,6 +18,7 @@ export default function QRMenuPage() {
   const [error, setError] = useState<string | null>(null);
   const [selectedItem, setSelectedItem] = useState<MenuItem | null>(null);
   const [sugarLevel, setSugarLevel] = useState("100%");
+  const [quantity, setQuantity] = useState(1);
   const [cart, setCart] = useState<CartItem[]>([]);
 
   useEffect(() => {
@@ -29,7 +30,6 @@ export default function QRMenuPage() {
         setLoading(true);
         setError(null);
 
-        // Fetch cafe name
         const { data: cafe } = await supabase
           .from("cafes")
           .select("name")
@@ -38,7 +38,6 @@ export default function QRMenuPage() {
 
         if (!cancelled && cafe) setCafeName(cafe.name);
 
-        // Fetch available menu items
         const { data, error } = await supabase
           .from("menus")
           .select("*")
@@ -61,14 +60,19 @@ export default function QRMenuPage() {
     return () => { cancelled = true; };
   }, [cafeId]);
 
-  const handleAddToCart = (item: MenuItem) => setSelectedItem(item);
+  const handleAddToCart = (item: MenuItem) => {
+    setSelectedItem(item);
+    setSugarLevel("100%");
+    setQuantity(1);
+  };
 
   const confirmAddToCart = () => {
     if (!selectedItem) return;
-    const newItem: CartItem = { ...selectedItem, sugarLevel, quantity: 1 };
+    const newItem: CartItem = { ...selectedItem, sugarLevel, quantity };
     setCart((prev) => [...prev, newItem]);
     setSelectedItem(null);
     setSugarLevel("100%");
+    setQuantity(1);
   };
 
   const goToPayment = () => {
@@ -78,6 +82,7 @@ export default function QRMenuPage() {
   };
 
   const cartTotal = cart.reduce((sum, item) => sum + item.price * item.quantity, 0);
+  const cartItemCount = cart.reduce((sum, item) => sum + item.quantity, 0);
 
   return (
     <>
@@ -277,6 +282,66 @@ export default function QRMenuPage() {
           border-color: rgba(200,135,58,0.45);
         }
 
+        /* Quantity picker */
+        .qty-row {
+          display: flex;
+          align-items: center;
+          justify-content: space-between;
+          background: #F7F3EE;
+          border: 1px solid rgba(200,135,58,0.2);
+          border-radius: 10px;
+          padding: 6px 8px;
+          margin-bottom: 24px;
+        }
+
+        .qty-btn {
+          width: 36px;
+          height: 36px;
+          border-radius: 8px;
+          border: none;
+          background: #ffffff;
+          color: #1A0F00;
+          font-size: 18px;
+          font-weight: 400;
+          cursor: pointer;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          box-shadow: 0 1px 4px rgba(0,0,0,0.08);
+          transition: background 0.15s, transform 0.1s;
+          flex-shrink: 0;
+          line-height: 1;
+        }
+
+        .qty-btn:hover:not(:disabled) {
+          background: rgba(200,135,58,0.08);
+          transform: scale(1.06);
+        }
+
+        .qty-btn:disabled {
+          opacity: 0.3;
+          cursor: not-allowed;
+          transform: none;
+        }
+
+        .qty-value {
+          font-family: 'Cormorant Garamond', serif;
+          font-size: 26px;
+          font-weight: 600;
+          color: #1A0F00;
+          min-width: 40px;
+          text-align: center;
+          line-height: 1;
+        }
+
+        .qty-subtotal {
+          font-size: 12px;
+          color: #C8873A;
+          font-weight: 500;
+          min-width: 52px;
+          text-align: right;
+        }
+
         .modal-actions {
           display: flex;
           gap: 10px;
@@ -355,14 +420,14 @@ export default function QRMenuPage() {
           )}
         </div>
 
-        {/* Cart button */}
+        {/* Cart button — now counts total quantity across all items */}
         {cart.length > 0 && (
           <button onClick={goToPayment} className="cart-btn">
-            View Order · {cart.length} {cart.length === 1 ? "item" : "items"} · ${cartTotal.toFixed(2)}
+            View Order · {cartItemCount} {cartItemCount === 1 ? "item" : "items"} · ${cartTotal.toFixed(2)}
           </button>
         )}
 
-        {/* Customization modal — bottom sheet style */}
+        {/* Customization modal */}
         {selectedItem && (
           <div className="modal-overlay" onClick={() => setSelectedItem(null)}>
             <div className="modal-card" onClick={(e) => e.stopPropagation()}>
@@ -384,12 +449,34 @@ export default function QRMenuPage() {
                 <option value="100%">100% — Full sweet</option>
               </select>
 
+              <label className="modal-label">Quantity</label>
+              <div className="qty-row">
+                <button
+                  className="qty-btn"
+                  disabled={quantity <= 1}
+                  onClick={() => setQuantity((q) => Math.max(1, q - 1))}
+                >
+                  −
+                </button>
+                <span className="qty-value">{quantity}</span>
+                <button
+                  className="qty-btn"
+                  disabled={quantity >= 20}
+                  onClick={() => setQuantity((q) => Math.min(20, q + 1))}
+                >
+                  +
+                </button>
+                <span className="qty-subtotal">
+                  ${(selectedItem.price * quantity).toFixed(2)}
+                </span>
+              </div>
+
               <div className="modal-actions">
                 <button onClick={() => setSelectedItem(null)} className="modal-cancel">
                   Cancel
                 </button>
                 <button onClick={confirmAddToCart} className="modal-confirm">
-                  Add to Order
+                  Add {quantity > 1 ? `${quantity}x ` : ""}to Order
                 </button>
               </div>
             </div>
