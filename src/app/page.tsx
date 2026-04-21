@@ -19,6 +19,9 @@ export default function HomePage() {
         .content {
           position: relative;
           z-index: 1;
+          min-height: 100vh;
+          display: flex;
+          flex-direction: column;
         }
 
         /* NAV */
@@ -33,6 +36,7 @@ export default function HomePage() {
           top: 0;
           z-index: 10;
           box-shadow: 0 2px 8px rgba(0,0,0,0.04);
+          flex-shrink: 0;
         }
 
         .nav-logo {
@@ -91,12 +95,18 @@ export default function HomePage() {
           border-color: rgba(200,135,58,0.5);
         }
 
-        /* HERO */
+        /* HERO — grows to fill all available space */
         .hero {
+          flex: 1;
+          display: flex;
+          flex-direction: column;
+          align-items: center;
+          justify-content: center;
           padding: 32px 80px;
           text-align: center;
           max-width: 900px;
           margin: 0 auto;
+          width: 100%;
         }
 
         .hero-badge {
@@ -151,13 +161,12 @@ export default function HomePage() {
           font-weight: 300;
           line-height: 1.7;
           max-width: 520px;
-          margin: 16px auto 32px;
+          margin: 16px auto 0;
         }
 
-        /* FEATURES STRIP */
+        /* FEATURES STRIP — pinned to bottom */
         .strip {
           border-top: 1px solid rgba(200,135,58,0.15);
-          border-bottom: 1px solid rgba(200,135,58,0.15);
           background: #ffffff;
           padding: 16px 48px;
           display: flex;
@@ -165,6 +174,7 @@ export default function HomePage() {
           justify-content: center;
           gap: 48px;
           flex-wrap: wrap;
+          flex-shrink: 0;
         }
 
         .strip-item {
@@ -181,180 +191,6 @@ export default function HomePage() {
           font-size: 14px;
         }
 
-        /* ROLE CARDS */
-        .cards-section {
-          padding: 0 48px 100px;
-          max-width: 900px;
-          margin: 0 auto;
-        }
-
-        .cards-label {
-          text-align: center;
-          font-size: 11px;
-          font-weight: 500;
-          letter-spacing: 0.2em;
-          text-transform: uppercase;
-          color: rgba(26,15,0,0.25);
-          margin-bottom: 32px;
-        }
-
-        .cards-grid {
-          display: grid;
-          grid-template-columns: 1fr 1fr;
-          gap: 20px;
-        }
-
-        .role-card {
-          position: relative;
-          background: #ffffff;
-          border: 1px solid rgba(200,135,58,0.15);
-          border-radius: 24px;
-          padding: 40px 36px;
-          text-decoration: none;
-          display: block;
-          overflow: hidden;
-          transition: all 0.35s cubic-bezier(0.4,0,0.2,1);
-          box-shadow: 0 2px 12px rgba(0,0,0,0.04);
-        }
-
-        .role-card::before {
-          content: '';
-          position: absolute;
-          inset: 0;
-          border-radius: 24px;
-          opacity: 0;
-          transition: opacity 0.35s ease;
-        }
-
-        .role-card.owner::before {
-          background: radial-gradient(ellipse at top left, rgba(200,135,58,0.07) 0%, transparent 65%);
-        }
-
-        .role-card.barista::before {
-          background: radial-gradient(ellipse at top left, rgba(180,100,30,0.07) 0%, transparent 65%);
-        }
-
-        .role-card:hover {
-          transform: translateY(-6px);
-          border-color: rgba(200,135,58,0.3);
-          box-shadow: 0 20px 48px rgba(200,135,58,0.1);
-        }
-
-        .role-card:hover::before {
-          opacity: 1;
-        }
-
-        .role-card-inner {
-          position: relative;
-          z-index: 1;
-        }
-
-        .role-icon-wrap {
-          width: 56px;
-          height: 56px;
-          border-radius: 16px;
-          display: flex;
-          align-items: center;
-          justify-content: center;
-          font-size: 26px;
-          margin-bottom: 24px;
-        }
-
-        .owner .role-icon-wrap {
-          background: rgba(200,135,58,0.1);
-          border: 1px solid rgba(200,135,58,0.2);
-        }
-
-        .barista .role-icon-wrap {
-          background: rgba(180,100,30,0.1);
-          border: 1px solid rgba(180,100,30,0.2);
-        }
-
-        .role-title {
-          font-family: 'Cormorant Garamond', serif;
-          font-size: 28px;
-          font-weight: 600;
-          color: #1A0F00;
-          margin-bottom: 10px;
-          letter-spacing: 0.02em;
-        }
-
-        .role-desc {
-          font-size: 13px;
-          color: rgba(26,15,0,0.45);
-          line-height: 1.65;
-          font-weight: 300;
-          margin-bottom: 32px;
-        }
-
-        .role-features {
-          list-style: none;
-          margin-bottom: 32px;
-          display: flex;
-          flex-direction: column;
-          gap: 8px;
-        }
-
-        .role-features li {
-          font-size: 12px;
-          color: rgba(26,15,0,0.4);
-          display: flex;
-          align-items: center;
-          gap: 10px;
-        }
-
-        .feature-dot {
-          width: 4px;
-          height: 4px;
-          border-radius: 50%;
-          flex-shrink: 0;
-        }
-
-        .owner .feature-dot { background: #C8873A; }
-        .barista .feature-dot { background: #B4641E; }
-
-        .role-btn {
-          display: inline-flex;
-          align-items: center;
-          gap: 10px;
-          font-size: 12px;
-          font-weight: 500;
-          letter-spacing: 0.1em;
-          text-transform: uppercase;
-          padding: 12px 24px;
-          border-radius: 100px;
-          border: 1px solid;
-          transition: all 0.2s ease;
-        }
-
-        .role-btn-arrow {
-          transition: transform 0.2s ease;
-        }
-
-        .role-card:hover .role-btn-arrow {
-          transform: translateX(5px);
-        }
-
-        .owner .role-btn {
-          color: #C8873A;
-          border-color: rgba(200,135,58,0.35);
-          background: rgba(200,135,58,0.08);
-        }
-
-        .owner:hover .role-btn {
-          background: rgba(200,135,58,0.16);
-        }
-
-        .barista .role-btn {
-          color: #B4641E;
-          border-color: rgba(180,100,30,0.35);
-          background: rgba(180,100,30,0.08);
-        }
-
-        .barista:hover .role-btn {
-          background: rgba(180,100,30,0.16);
-        }
-
         /* FOOTER */
         footer {
           padding: 24px 48px;
@@ -363,6 +199,7 @@ export default function HomePage() {
           display: flex;
           align-items: center;
           justify-content: space-between;
+          flex-shrink: 0;
         }
 
         .footer-logo {
@@ -381,9 +218,7 @@ export default function HomePage() {
         @media (max-width: 680px) {
           nav { padding: 16px 20px; }
           .nav-links { display: none; }
-          .hero { padding: 60px 24px 60px; }
-          .cards-section { padding: 0 24px 60px; }
-          .cards-grid { grid-template-columns: 1fr; }
+          .hero { padding: 40px 24px; }
           .strip { padding: 20px 24px; gap: 24px; }
           footer { padding: 20px 24px; }
         }
@@ -398,13 +233,12 @@ export default function HomePage() {
               CafeBoost
             </span>
             <div className="nav-links">
-              {/* ✅ Added className to fix hover and color */}
               <Link href="/auth/signin" className="nav-link">Sign In</Link>
               <Link href="/auth/signup" className="nav-link primary">Get Started</Link>
             </div>
           </nav>
 
-          {/* Hero */}
+          {/* Hero — fills remaining space */}
           <section className="hero">
             <div className="hero-badge">
               <span className="hero-badge-dot" />
@@ -419,7 +253,7 @@ export default function HomePage() {
             </p>
           </section>
 
-          {/* Feature strip */}
+          {/* Feature strip — sits just above footer */}
           <div className="strip">
             {[
               { icon: "◈", label: "QR Menu Ordering" },

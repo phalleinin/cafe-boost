@@ -17,7 +17,7 @@ type Order = {
 type RawOrderItem = {
   order_id: string;
   quantity: number;
-  price: number;
+  unit_price: number;
   menus: { name: string }[] | null;
 };
 
@@ -169,19 +169,24 @@ export default function OwnerAnalyticPage() {
 
         const orderIds = fetchedOrders.map((o) => o.id);
         if (orderIds.length > 0) {
+          // Use unit_price to match the actual column name in order_items
           const { data: items, error: itemsError } = await supabase
             .from("order_items")
-            .select("order_id, quantity, price, menus(name)")
+            .select("order_id, quantity, unit_price, menus(name)")
             .in("order_id", orderIds);
 
           if (itemsError) throw itemsError;
 
-          const mapped: MappedOrderItem[] = ((items as RawOrderItem[]) || []).map((oi) => ({
-            order_id: oi.order_id,
-            quantity: oi.quantity,
-            price: oi.price ?? 0,
-            menu_name: oi.menus?.[0]?.name ?? t.analytics.unknownItem,
-          }));
+          const mapped: MappedOrderItem[] = ((items as unknown[]) || []).map((raw) => {
+            const oi = raw as { order_id: string; quantity: number; unit_price: number; menus: unknown };
+            let menuName = t.analytics.unknownItem;
+            if (Array.isArray(oi.menus) && oi.menus.length > 0) {
+              menuName = (oi.menus[0] as { name: string }).name || t.analytics.unknownItem;
+            } else if (oi.menus !== null && typeof oi.menus === "object") {
+              menuName = (oi.menus as { name: string }).name || t.analytics.unknownItem;
+            }
+            return { order_id: oi.order_id, quantity: oi.quantity, price: oi.unit_price ?? 0, menu_name: menuName };
+          });
 
           setOrderItems(mapped);
         }
@@ -318,12 +323,7 @@ export default function OwnerAnalyticPage() {
         .pop-count { font-size: 13px; color: #C8873A; font-weight: 500; }
         .pop-rev { font-size: 10px; color: rgba(26,15,0,0.3); margin-top: 2px; }
 
-        .order-row { display: flex; align-items: center; padding: 9px 0; border-bottom: 1px solid rgba(0,0,0,0.05); gap: 10px; }
-        .order-row:last-child { border-bottom: none; }
-        .order-customer { font-size: 13px; color: rgba(26,15,0,0.7); flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-        .order-total { font-size: 13px; color: #C8873A; font-weight: 500; white-space: nowrap; }
-        .order-time { font-size: 10px; color: rgba(26,15,0,0.28); white-space: nowrap; }
-        .status-badge { font-size: 9px; font-weight: 500; letter-spacing: 0.08em; text-transform: uppercase; padding: 3px 9px; border-radius: 100px; white-space: nowrap; }
+        .heat-period-label { font-size: 10px; font-weight: 500; letter-spacing: 0.12em; text-transform: uppercase; color: rgba(26,15,0,0.3); margin-bottom: 6px; }
 
         .completion-ring-wrap { display: flex; align-items: center; gap: 20px; }
         .completion-pct { font-family: 'Cormorant Garamond', serif; font-size: 40px; font-weight: 600; color: #1A8A50; line-height: 1; }
@@ -429,12 +429,7 @@ export default function OwnerAnalyticPage() {
             <h2 className="section-title">Order Completion</h2>
             <div className="completion-ring-wrap">
               <svg width="90" height="90" style={{ flexShrink: 0 }}>
-                <circle
-                  cx="45" cy="45" r="36"
-                  fill="none"
-                  stroke="rgba(0,0,0,0.06)"
-                  strokeWidth="8"
-                />
+                <circle cx="45" cy="45" r="36" fill="none" stroke="rgba(0,0,0,0.06)" strokeWidth="8" />
                 <circle
                   cx="45" cy="45" r="36"
                   fill="none"
@@ -457,7 +452,7 @@ export default function OwnerAnalyticPage() {
           </div>
         </div>
 
-        {/* Popular Drinks + Recent Orders */}
+        {/* Popular Drinks + Busiest Hours */}
         <div className="row-2">
           <div className="panel">
             <h2 className="section-title">Popular Drinks</h2>
@@ -472,14 +467,11 @@ export default function OwnerAnalyticPage() {
                     <div className="pop-info">
                       <div className="pop-name">{item.name}</div>
                       <div className="pop-bar-wrap">
-                        <div
-                          className="pop-bar"
-                          style={{ width: `${(item.count / max) * 100}%` }}
-                        />
+                        <div className="pop-bar" style={{ width: `${(item.count / max) * 100}%` }} />
                       </div>
                     </div>
                     <div className="pop-meta">
-                      <div className="pop-count">x{item.count}</div>
+                      <div className="pop-count">×{item.count}</div>
                       <div className="pop-rev">${item.revenue.toFixed(2)}</div>
                     </div>
                   </div>
@@ -489,110 +481,65 @@ export default function OwnerAnalyticPage() {
           </div>
 
           <div className="panel">
-            <h2 className="section-title">Recent Orders</h2>
-            {data.recentOrders.length === 0 ? (
-              <p className="empty-state">No orders in this period</p>
+            <h2 className="section-title">Busiest Hours</h2>
+            {data.totalOrders === 0 ? (
+              <p className="empty-state">No order data yet</p>
             ) : (
-              data.recentOrders.map((order) => {
-                const s = getStatusStyle(order.status);
-                const mins = Math.floor(
-                  (Date.now() - new Date(order.created_at).getTime()) / 60000
-                );
-                const timeAgo =
-                  mins < 60
-                    ? `${mins}m ago`
-                    : mins < 1440
-                    ? `${Math.floor(mins / 60)}h ago`
-                    : `${Math.floor(mins / 1440)}d ago`;
+              <>
+                <p className="heat-period-label">AM</p>
+                <div className="heatmap-grid">
+                  {data.hourlyOrders.slice(0, 12).map((h) => {
+                    const intensity = h.count / maxHourly;
+                    const bg = intensity === 0
+                      ? "rgba(0,0,0,0.04)"
+                      : `rgba(200,135,58,${(0.1 + intensity * 0.85).toFixed(2)})`;
+                    const textColor = intensity > 0.6 ? "#fff" : "rgba(26,15,0,0.45)";
+                    return (
+                      <div key={h.hour} className="heat-cell"
+                        style={{ background: bg, color: textColor }}
+                        title={`${String(h.hour).padStart(2, "0")}:00 — ${h.count} orders`}
+                      >
+                        {h.count > 0 ? h.count : ""}
+                      </div>
+                    );
+                  })}
+                </div>
+                <div className="heatmap-labels">
+                  {data.hourlyOrders.slice(0, 12).map((h) => (
+                    <div key={h.hour} className="heat-label">{String(h.hour).padStart(2, "0")}</div>
+                  ))}
+                </div>
 
-                return (
-                  <div key={order.id} className="order-row">
-                    <span className="order-customer">{order.customer_name}</span>
-                    <span className="order-total">${order.total.toFixed(2)}</span>
-                    <span className="order-time">{timeAgo}</span>
-                    <span
-                      className="status-badge"
-                      style={{ background: s.bg, color: s.color }}
-                    >
-                      {s.label}
-                    </span>
-                  </div>
-                );
-              })
+                <p className="heat-period-label" style={{ marginTop: 14 }}>PM</p>
+                <div className="heatmap-grid">
+                  {data.hourlyOrders.slice(12).map((h) => {
+                    const intensity = h.count / maxHourly;
+                    const bg = intensity === 0
+                      ? "rgba(0,0,0,0.04)"
+                      : `rgba(200,135,58,${(0.1 + intensity * 0.85).toFixed(2)})`;
+                    const textColor = intensity > 0.6 ? "#fff" : "rgba(26,15,0,0.45)";
+                    return (
+                      <div key={h.hour} className="heat-cell"
+                        style={{ background: bg, color: textColor }}
+                        title={`${String(h.hour).padStart(2, "0")}:00 — ${h.count} orders`}
+                      >
+                        {h.count > 0 ? h.count : ""}
+                      </div>
+                    );
+                  })}
+                </div>
+                <div className="heatmap-labels">
+                  {data.hourlyOrders.slice(12).map((h) => (
+                    <div key={h.hour} className="heat-label">{String(h.hour).padStart(2, "0")}</div>
+                  ))}
+                </div>
+
+                <p style={{ fontSize: 10, color: "rgba(26,15,0,0.25)", marginTop: 12 }}>
+                  Darker = more orders · Hover to see exact count
+                </p>
+              </>
             )}
           </div>
-        </div>
-
-        {/* Busiest Hours Heatmap */}
-        <div className="panel">
-          <h2 className="section-title">Busiest Hours</h2>
-          {data.totalOrders === 0 ? (
-            <p className="empty-state">No order data yet</p>
-          ) : (
-            <>
-              <div className="heatmap-grid">
-                {data.hourlyOrders.slice(0, 12).map((h) => {
-                  const intensity = h.count / maxHourly;
-                  const bg =
-                    intensity === 0
-                      ? "rgba(0,0,0,0.04)"
-                      : `rgba(200,135,58,${(0.1 + intensity * 0.85).toFixed(2)})`;
-                  const textColor =
-                    intensity > 0.6 ? "#fff" : "rgba(26,15,0,0.45)";
-                  return (
-                    <div
-                      key={h.hour}
-                      className="heat-cell"
-                      style={{ background: bg, color: textColor }}
-                      title={`${String(h.hour).padStart(2, "0")}:00 — ${h.count} orders`}
-                    >
-                      {h.count > 0 ? h.count : ""}
-                    </div>
-                  );
-                })}
-              </div>
-              <div className="heatmap-labels">
-                {data.hourlyOrders.slice(0, 12).map((h) => (
-                  <div key={h.hour} className="heat-label">
-                    {String(h.hour).padStart(2, "0")}
-                  </div>
-                ))}
-              </div>
-
-              <div className="heatmap-grid" style={{ marginTop: 10 }}>
-                {data.hourlyOrders.slice(12).map((h) => {
-                  const intensity = h.count / maxHourly;
-                  const bg =
-                    intensity === 0
-                      ? "rgba(0,0,0,0.04)"
-                      : `rgba(200,135,58,${(0.1 + intensity * 0.85).toFixed(2)})`;
-                  const textColor =
-                    intensity > 0.6 ? "#fff" : "rgba(26,15,0,0.45)";
-                  return (
-                    <div
-                      key={h.hour}
-                      className="heat-cell"
-                      style={{ background: bg, color: textColor }}
-                      title={`${String(h.hour).padStart(2, "0")}:00 — ${h.count} orders`}
-                    >
-                      {h.count > 0 ? h.count : ""}
-                    </div>
-                  );
-                })}
-              </div>
-              <div className="heatmap-labels">
-                {data.hourlyOrders.slice(12).map((h) => (
-                  <div key={h.hour} className="heat-label">
-                    {String(h.hour).padStart(2, "0")}
-                  </div>
-                ))}
-              </div>
-
-              <p style={{ fontSize: 10, color: "rgba(26,15,0,0.25)", marginTop: 10 }}>
-                Darker = more orders · Hover a cell to see the exact count
-              </p>
-            </>
-          )}
         </div>
       </div>
     </>
