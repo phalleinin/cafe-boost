@@ -56,12 +56,6 @@ type AnalyticsSummary = {
   hourlyOrders: HourlyOrder[];
 };
 
-const PERIODS: { key: Period; label: string }[] = [
-  { key: "today", label: "Today" },
-  { key: "week", label: "7 Days" },
-  { key: "month", label: "30 Days" },
-];
-
 function getPeriodStart(period: Period): Date {
   const d = new Date();
   if (period === "today") {
@@ -76,38 +70,6 @@ function getPeriodStart(period: Period): Date {
   return d;
 }
 
-function buildDailyRevenue(orders: Order[], period: Period): DailyRevenue[] {
-  const count = period === "today" ? 1 : period === "week" ? 7 : 30;
-  const days: DailyRevenue[] = [];
-
-  for (let i = count - 1; i >= 0; i--) {
-    const d = new Date();
-    d.setDate(d.getDate() - i);
-    d.setHours(0, 0, 0, 0);
-    const next = new Date(d);
-    next.setDate(next.getDate() + 1);
-
-    const label =
-      period === "today"
-        ? "Today"
-        : period === "week"
-        ? d.toLocaleDateString("en-US", { weekday: "short" })
-        : d.toLocaleDateString("en-US", { month: "short", day: "numeric" });
-
-    const dayOrders = orders.filter((o) => {
-      const t = new Date(o.created_at);
-      return t >= d && t < next && o.status === "completed";
-    });
-
-    days.push({
-      label,
-      revenue: dayOrders.reduce((s, o) => s + o.total, 0),
-      orders: dayOrders.length,
-    });
-  }
-  return days;
-}
-
 function buildHourlyOrders(orders: Order[]): HourlyOrder[] {
   const hours: HourlyOrder[] = Array.from({ length: 24 }, (_, h) => ({ hour: h, count: 0 }));
   orders.forEach((o) => {
@@ -119,6 +81,82 @@ function buildHourlyOrders(orders: Order[]): HourlyOrder[] {
 
 export default function OwnerAnalyticPage() {
   const { t } = useLocale();
+  const isKhmer = t.meta.isKhmer;
+
+  const PERIODS: { key: Period; label: string }[] = useMemo(
+    () => [
+      { key: "today", label: t.analytics.period.today },
+      { key: "week", label: t.analytics.period.week },
+      { key: "month", label: t.analytics.period.month },
+    ],
+    [t]
+  );
+
+  const getWeekdayLabel = (date: Date) => {
+    if (!isKhmer) {
+      return date.toLocaleDateString("en-US", { weekday: "short" });
+    }
+
+    const khmerWeekdays = ["អាទិត្យ", "ច័ន្ទ", "អង្គារ", "ពុធ", "ព្រហស្បតិ៍", "សុក្រ", "សៅរ៍"];
+    return khmerWeekdays[date.getDay()];
+  };
+
+  const getMonthDayLabel = (date: Date) => {
+    if (!isKhmer) {
+      return date.toLocaleDateString("en-US", { month: "short", day: "numeric" });
+    }
+
+    const khmerMonths = [
+      "មករា",
+      "កុម្ភៈ",
+      "មីនា",
+      "មេសា",
+      "ឧសភា",
+      "មិថុនា",
+      "កក្កដា",
+      "សីហា",
+      "កញ្ញា",
+      "តុលា",
+      "វិច្ឆិកា",
+      "ធ្នូ",
+    ];
+
+    return `${date.getDate()} ${khmerMonths[date.getMonth()]}`;
+  };
+
+  const buildDailyRevenue = (orders: Order[], period: Period): DailyRevenue[] => {
+    const count = period === "today" ? 1 : period === "week" ? 7 : 30;
+    const days: DailyRevenue[] = [];
+
+    for (let i = count - 1; i >= 0; i--) {
+      const d = new Date();
+      d.setDate(d.getDate() - i);
+      d.setHours(0, 0, 0, 0);
+      const next = new Date(d);
+      next.setDate(next.getDate() + 1);
+
+      const label =
+        period === "today"
+          ? t.analytics.period.today
+          : period === "week"
+          ? getWeekdayLabel(d)
+          : getMonthDayLabel(d);
+
+      const dayOrders = orders.filter((o) => {
+        const time = new Date(o.created_at);
+        return time >= d && time < next && o.status === "completed";
+      });
+
+      days.push({
+        label,
+        revenue: dayOrders.reduce((s, o) => s + o.total, 0),
+        orders: dayOrders.length,
+      });
+    }
+
+    return days;
+  };
+
   const [cafeId, setCafeId] = useState<string | null>(null);
   const [allOrders, setAllOrders] = useState<Order[]>([]);
   const [orderItems, setOrderItems] = useState<MappedOrderItem[]>([]);
@@ -129,8 +167,14 @@ export default function OwnerAnalyticPage() {
   useEffect(() => {
     const init = async () => {
       try {
-        const { data: { user } } = await supabase.auth.getUser();
-        if (!user) { window.location.href = "/auth/signin"; return; }
+        const {
+          data: { user },
+        } = await supabase.auth.getUser();
+
+        if (!user) {
+          window.location.href = "/auth/signin";
+          return;
+        }
 
         const { data: profile, error: profileError } = await supabase
           .from("profiles")
@@ -139,7 +183,11 @@ export default function OwnerAnalyticPage() {
           .single();
 
         if (profileError) throw profileError;
-        if (!profile?.cafe_id) { window.location.href = "/auth/setup-cafe"; return; }
+        if (!profile?.cafe_id) {
+          window.location.href = "/auth/setup-cafe";
+          return;
+        }
+
         setCafeId(profile.cafe_id);
       } catch (err) {
         setError(err instanceof Error ? err.message : t.analytics.failedToLoadProfile);
@@ -151,6 +199,7 @@ export default function OwnerAnalyticPage() {
 
   useEffect(() => {
     if (!cafeId) return;
+
     const fetchData = async () => {
       try {
         setLoading(true);
@@ -169,7 +218,6 @@ export default function OwnerAnalyticPage() {
 
         const orderIds = fetchedOrders.map((o) => o.id);
         if (orderIds.length > 0) {
-          // Use unit_price to match the actual column name in order_items
           const { data: items, error: itemsError } = await supabase
             .from("order_items")
             .select("order_id, quantity, unit_price, menus(name)")
@@ -180,16 +228,26 @@ export default function OwnerAnalyticPage() {
           const mapped: MappedOrderItem[] = ((items as unknown[]) || []).map((raw) => {
             const oi = raw as { order_id: string; quantity: number; unit_price: number; menus: unknown };
             let menuName = t.analytics.unknownItem;
+
             if (Array.isArray(oi.menus) && oi.menus.length > 0) {
               menuName = (oi.menus[0] as { name: string }).name || t.analytics.unknownItem;
             } else if (oi.menus !== null && typeof oi.menus === "object") {
               menuName = (oi.menus as { name: string }).name || t.analytics.unknownItem;
             }
-            return { order_id: oi.order_id, quantity: oi.quantity, price: oi.unit_price ?? 0, menu_name: menuName };
+
+            return {
+              order_id: oi.order_id,
+              quantity: oi.quantity,
+              price: oi.unit_price ?? 0,
+              menu_name: menuName,
+            };
           });
 
           setOrderItems(mapped);
+        } else {
+          setOrderItems([]);
         }
+
         setError(null);
       } catch (err) {
         setError(err instanceof Error ? err.message : t.analytics.failedToLoadAnalytics);
@@ -197,6 +255,7 @@ export default function OwnerAnalyticPage() {
         setLoading(false);
       }
     };
+
     void fetchData();
   }, [cafeId, t.analytics.failedToLoadAnalytics, t.analytics.unknownItem]);
 
@@ -235,19 +294,10 @@ export default function OwnerAnalyticPage() {
       dailyRevenue: buildDailyRevenue(filtered, period),
       hourlyOrders: buildHourlyOrders(filtered),
     };
-  }, [allOrders, orderItems, period]);
-
-  const getStatusStyle = (status: string) => {
-    switch (status) {
-      case "pending":   return { bg: "rgba(255,180,0,0.12)",  color: "#B87800", label: t.orders.status.pending };
-      case "preparing": return { bg: "rgba(58,124,200,0.10)", color: "#2A6CB8", label: t.orders.status.preparing };
-      case "completed": return { bg: "rgba(40,160,90,0.10)",  color: "#1A8A50", label: t.orders.status.completed };
-      default:          return { bg: "rgba(0,0,0,0.05)",      color: "#888",    label: status };
-    }
-  };
+  }, [allOrders, orderItems, period, t, isKhmer]);
 
   const maxRevenue = Math.max(...data.dailyRevenue.map((d) => d.revenue), 1);
-  const maxHourly  = Math.max(...data.hourlyOrders.map((h) => h.count), 1);
+  const maxHourly = Math.max(...data.hourlyOrders.map((h) => h.count), 1);
 
   const peakHour: HourlyOrder = data.hourlyOrders.reduce(
     (a, b) => (b.count > a.count ? b : a),
@@ -281,7 +331,7 @@ export default function OwnerAnalyticPage() {
         .period-btn {
           padding: 7px 18px; border-radius: 100px;
           border: 1px solid rgba(200,135,58,0.25); background: transparent;
-          font-family: 'DM Sans', sans-serif; font-size: 12px;
+          font-family: 'DM Sans', 'Noto Sans Khmer', sans-serif; font-size: 12px;
           color: rgba(26,15,0,0.5); cursor: pointer;
           transition: all 0.18s; letter-spacing: 0.04em;
         }
@@ -350,7 +400,6 @@ export default function OwnerAnalyticPage() {
       <div className="dash">
         {error && !data.totalOrders && <p className="error-msg">{error}</p>}
 
-        {/* Period Toggle */}
         <div className="period-bar">
           {PERIODS.map((p) => (
             <button
@@ -363,42 +412,38 @@ export default function OwnerAnalyticPage() {
           ))}
         </div>
 
-        {/* KPI Cards */}
         <div className="kpi-grid">
           <div className="kpi-card">
-            <p className="kpi-label">Total Orders</p>
+            <p className="kpi-label">{t.analytics.cards.totalOrders}</p>
             <p className="kpi-value">{data.totalOrders}</p>
-            <p className="kpi-sub">in selected period</p>
+            <p className="kpi-sub">{t.analytics.sub.selectedPeriod}</p>
           </div>
           <div className="kpi-card">
-            <p className="kpi-label">Total Revenue</p>
+            <p className="kpi-label">{t.analytics.cards.totalRevenue}</p>
             <p className="kpi-value kpi-accent">${data.totalRevenue.toFixed(2)}</p>
-            <p className="kpi-sub">completed orders only</p>
+            <p className="kpi-sub">{t.analytics.sub.completedOrdersOnly}</p>
           </div>
           <div className="kpi-card">
-            <p className="kpi-label">Avg Order Value</p>
+            <p className="kpi-label">{t.analytics.cards.avgOrderValue}</p>
             <p className="kpi-value">${data.avgOrderValue.toFixed(2)}</p>
-            <p className="kpi-sub">completed orders only</p>
+            <p className="kpi-sub">{t.analytics.sub.completedOrdersOnly}</p>
           </div>
           <div className="kpi-card">
-            <p className="kpi-label">Peak Hour</p>
+            <p className="kpi-label">{t.analytics.cards.peakHour}</p>
             <p className="kpi-value kpi-accent">
-              {peakHour.count > 0
-                ? `${String(peakHour.hour).padStart(2, "0")}:00`
-                : "—"}
+              {peakHour.count > 0 ? `${String(peakHour.hour).padStart(2, "0")}:00` : "—"}
             </p>
             <p className="kpi-sub">
-              {peakHour.count > 0 ? `${peakHour.count} orders` : "no data"}
+              {peakHour.count > 0 ? `${peakHour.count} ${t.analytics.units.orders}` : t.analytics.sub.noData}
             </p>
           </div>
         </div>
 
-        {/* Revenue Chart + Completion Rate */}
         <div className="row-2">
           <div className="panel">
-            <h2 className="section-title">Daily Revenue</h2>
+            <h2 className="section-title">{t.analytics.sections.dailyRevenue}</h2>
             {data.totalOrders === 0 ? (
-              <p className="chart-zero">No orders in this period</p>
+              <p className="chart-zero">{t.analytics.sub.noOrdersInPeriod}</p>
             ) : (
               <>
                 <div className="chart-bars">
@@ -407,7 +452,7 @@ export default function OwnerAnalyticPage() {
                       <div
                         className="chart-bar"
                         style={{ height: `${(d.revenue / maxRevenue) * 100}%` }}
-                        title={`$${d.revenue.toFixed(2)} · ${d.orders} completed`}
+                        title={`$${d.revenue.toFixed(2)} · ${d.orders} ${t.analytics.completion.completed}`}
                       />
                     </div>
                   ))}
@@ -415,9 +460,7 @@ export default function OwnerAnalyticPage() {
                 <div style={{ display: "flex", gap: 5, marginTop: 4 }}>
                   {data.dailyRevenue.map((d, i) => (
                     <div key={i} className="chart-bar-label" style={{ flex: 1 }}>
-                      {period === "month" && data.dailyRevenue.length > 14
-                        ? i % 5 === 0 ? d.label : ""
-                        : d.label}
+                      {period === "month" && data.dailyRevenue.length > 14 ? (i % 5 === 0 ? d.label : "") : d.label}
                     </div>
                   ))}
                 </div>
@@ -426,12 +469,14 @@ export default function OwnerAnalyticPage() {
           </div>
 
           <div className="panel">
-            <h2 className="section-title">Order Completion</h2>
+            <h2 className="section-title">{t.analytics.sections.orderCompletion}</h2>
             <div className="completion-ring-wrap">
               <svg width="90" height="90" style={{ flexShrink: 0 }}>
                 <circle cx="45" cy="45" r="36" fill="none" stroke="rgba(0,0,0,0.06)" strokeWidth="8" />
                 <circle
-                  cx="45" cy="45" r="36"
+                  cx="45"
+                  cy="45"
+                  r="36"
                   fill="none"
                   stroke="#1A8A50"
                   strokeWidth="8"
@@ -443,21 +488,20 @@ export default function OwnerAnalyticPage() {
               </svg>
               <div>
                 <p className="completion-pct">{data.completionRate.toFixed(0)}%</p>
-                <p className="completion-label">Completed</p>
+                <p className="completion-label">{t.analytics.completion.completed}</p>
                 <p className="kpi-sub" style={{ marginTop: 6 }}>
-                  {data.totalOrders === 0 ? "No orders yet" : `${data.totalOrders} total orders`}
+                  {data.totalOrders === 0 ? t.analytics.sub.noOrdersYet : `${data.totalOrders} ${t.analytics.sub.totalOrders}`}
                 </p>
               </div>
             </div>
           </div>
         </div>
 
-        {/* Popular Drinks + Busiest Hours */}
         <div className="row-2">
           <div className="panel">
-            <h2 className="section-title">Popular Drinks</h2>
+            <h2 className="section-title">{t.analytics.sections.popularDrink}</h2>
             {data.popularItems.length === 0 ? (
-              <p className="empty-state">No order data yet</p>
+              <p className="empty-state">{t.analytics.empty.noOrderData}</p>
             ) : (
               data.popularItems.map((item, i) => {
                 const max = data.popularItems[0]?.count ?? 1;
@@ -481,23 +525,26 @@ export default function OwnerAnalyticPage() {
           </div>
 
           <div className="panel">
-            <h2 className="section-title">Busiest Hours</h2>
+            <h2 className="section-title">{t.analytics.sections.busiestHours}</h2>
             {data.totalOrders === 0 ? (
-              <p className="empty-state">No order data yet</p>
+              <p className="empty-state">{t.analytics.empty.noOrderData}</p>
             ) : (
               <>
-                <p className="heat-period-label">AM</p>
+                <p className="heat-period-label">{t.analytics.time.am}</p>
                 <div className="heatmap-grid">
                   {data.hourlyOrders.slice(0, 12).map((h) => {
                     const intensity = h.count / maxHourly;
-                    const bg = intensity === 0
-                      ? "rgba(0,0,0,0.04)"
-                      : `rgba(200,135,58,${(0.1 + intensity * 0.85).toFixed(2)})`;
+                    const bg =
+                      intensity === 0
+                        ? "rgba(0,0,0,0.04)"
+                        : `rgba(200,135,58,${(0.1 + intensity * 0.85).toFixed(2)})`;
                     const textColor = intensity > 0.6 ? "#fff" : "rgba(26,15,0,0.45)";
                     return (
-                      <div key={h.hour} className="heat-cell"
+                      <div
+                        key={h.hour}
+                        className="heat-cell"
                         style={{ background: bg, color: textColor }}
-                        title={`${String(h.hour).padStart(2, "0")}:00 — ${h.count} orders`}
+                        title={`${String(h.hour).padStart(2, "0")}:00 — ${h.count} ${t.analytics.units.orders}`}
                       >
                         {h.count > 0 ? h.count : ""}
                       </div>
@@ -506,22 +553,29 @@ export default function OwnerAnalyticPage() {
                 </div>
                 <div className="heatmap-labels">
                   {data.hourlyOrders.slice(0, 12).map((h) => (
-                    <div key={h.hour} className="heat-label">{String(h.hour).padStart(2, "0")}</div>
+                    <div key={h.hour} className="heat-label">
+                      {String(h.hour).padStart(2, "0")}
+                    </div>
                   ))}
                 </div>
 
-                <p className="heat-period-label" style={{ marginTop: 14 }}>PM</p>
+                <p className="heat-period-label" style={{ marginTop: 14 }}>
+                  {t.analytics.time.pm}
+                </p>
                 <div className="heatmap-grid">
                   {data.hourlyOrders.slice(12).map((h) => {
                     const intensity = h.count / maxHourly;
-                    const bg = intensity === 0
-                      ? "rgba(0,0,0,0.04)"
-                      : `rgba(200,135,58,${(0.1 + intensity * 0.85).toFixed(2)})`;
+                    const bg =
+                      intensity === 0
+                        ? "rgba(0,0,0,0.04)"
+                        : `rgba(200,135,58,${(0.1 + intensity * 0.85).toFixed(2)})`;
                     const textColor = intensity > 0.6 ? "#fff" : "rgba(26,15,0,0.45)";
                     return (
-                      <div key={h.hour} className="heat-cell"
+                      <div
+                        key={h.hour}
+                        className="heat-cell"
                         style={{ background: bg, color: textColor }}
-                        title={`${String(h.hour).padStart(2, "0")}:00 — ${h.count} orders`}
+                        title={`${String(h.hour).padStart(2, "0")}:00 — ${h.count} ${t.analytics.units.orders}`}
                       >
                         {h.count > 0 ? h.count : ""}
                       </div>
@@ -530,12 +584,14 @@ export default function OwnerAnalyticPage() {
                 </div>
                 <div className="heatmap-labels">
                   {data.hourlyOrders.slice(12).map((h) => (
-                    <div key={h.hour} className="heat-label">{String(h.hour).padStart(2, "0")}</div>
+                    <div key={h.hour} className="heat-label">
+                      {String(h.hour).padStart(2, "0")}
+                    </div>
                   ))}
                 </div>
 
                 <p style={{ fontSize: 10, color: "rgba(26,15,0,0.25)", marginTop: 12 }}>
-                  Darker = more orders · Hover to see exact count
+                  {t.analytics.sub.darkerMoreOrders}
                 </p>
               </>
             )}

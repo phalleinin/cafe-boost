@@ -68,17 +68,42 @@ export type Messages = {
     failedToLoadProfile: string;
     failedToLoadAnalytics: string;
     unknownItem: string;
-    kpi: {
+    period: {
+      today: string;
+      week: string;
+      month: string;
+    };
+    cards: {
       totalOrders: string;
       totalRevenue: string;
-      todayOrders: string;
-      todayRevenue: string;
-      allTime: string;
-      sinceMidnight: string;
+      avgOrderValue: string;
+      peakHour: string;
+    };
+    sub: {
+      selectedPeriod: string;
+      completedOrdersOnly: string;
+      noData: string;
+      noOrdersInPeriod: string;
+      noOrdersYet: string;
+      totalOrders: string;
+      darkerMoreOrders: string;
     };
     sections: {
+      dailyRevenue: string;
+      orderCompletion: string;
       popularDrink: string;
       recentOrders: string;
+      busiestHours: string;
+    };
+    completion: {
+      completed: string;
+    };
+    time: {
+      am: string;
+      pm: string;
+    };
+    units: {
+      orders: string;
     };
     empty: {
       noOrderData: string;
@@ -101,6 +126,16 @@ export type Messages = {
     failedToDeleteItem: string;
     failedToUpdateItem: string;
     confirmDelete: string;
+    searchPlaceholder: string;
+    noSearchResults: string;
+    categories: {
+      hotDrinks: string;
+      coldDrinks: string;
+      frappe: string;
+      otherDrinks: string;
+      hot: string;
+      cold: string;
+    };
     actions: {
       edit: string;
       delete: string;
@@ -111,6 +146,9 @@ export type Messages = {
     };
     modal: {
       editTitle: string;
+      itemImage: string;
+      imagePreviewAlt: string;
+      category: string;
       name: string;
       namePlaceholder: string;
       description: string;
@@ -258,17 +296,42 @@ export const messages: Record<Locale, Messages> = {
       failedToLoadProfile: "Failed to load profile",
       failedToLoadAnalytics: "Failed to load analytics",
       unknownItem: "Unknown",
-      kpi: {
+      period: {
+        today: "Today",
+        week: "7 Days",
+        month: "30 Days",
+      },
+      cards: {
         totalOrders: "Total Orders",
         totalRevenue: "Total Revenue",
-        todayOrders: "Today's Orders",
-        todayRevenue: "Today's Revenue",
-        allTime: "All time",
-        sinceMidnight: "Since midnight",
+        avgOrderValue: "Avg Order Value",
+        peakHour: "Peak Hour",
+      },
+      sub: {
+        selectedPeriod: "in selected period",
+        completedOrdersOnly: "completed orders only",
+        noData: "no data",
+        noOrdersInPeriod: "No orders in this period",
+        noOrdersYet: "No orders yet",
+        totalOrders: "total orders",
+        darkerMoreOrders: "Darker = more orders · Hover to see exact count",
       },
       sections: {
-        popularDrink: "Popular Drink",
+        dailyRevenue: "Daily Revenue",
+        orderCompletion: "Order Completion",
+        popularDrink: "Popular Drinks",
         recentOrders: "Recent Orders",
+        busiestHours: "Busiest Hours",
+      },
+      completion: {
+        completed: "Completed",
+      },
+      time: {
+        am: "AM",
+        pm: "PM",
+      },
+      units: {
+        orders: "orders",
       },
       empty: {
         noOrderData: "No order data yet",
@@ -291,6 +354,16 @@ export const messages: Record<Locale, Messages> = {
       failedToDeleteItem: "Failed to delete item",
       failedToUpdateItem: "Failed to update item",
       confirmDelete: "Delete this item?",
+      searchPlaceholder: "Search drinks...",
+      noSearchResults: "No drinks found.",
+      categories: {
+        hotDrinks: "Hot Drinks",
+        coldDrinks: "Cold Drinks",
+        frappe: "Frappe",
+        otherDrinks: "Other Drinks",
+        hot: "Hot",
+        cold: "Cold",
+      },
       actions: {
         edit: "Edit",
         delete: "Delete",
@@ -301,6 +374,9 @@ export const messages: Record<Locale, Messages> = {
       },
       modal: {
         editTitle: "Edit Item",
+        itemImage: "Item Image",
+        imagePreviewAlt: "Edit item preview",
+        category: "Category",
         name: "Name",
         namePlaceholder: "Item name",
         description: "Description",
@@ -387,98 +463,133 @@ export const messages: Record<Locale, Messages> = {
       loading: "កំពុងផ្ទុក...",
       signOut: "ចាកចេញ",
       language: "ភាសា",
-      english: "អង់គ្លេស",
-      khmer: "ខ្មែរ",
+      english: "ភាសាអង់គ្លេស",
+      khmer: "ភាសាខ្មែរ",
       owner: "ម្ចាស់ហាង",
       dashboard: "ផ្ទាំងគ្រប់គ្រង",
     },
 
     nav: {
       orders: "ការបញ្ជាទិញ",
-      analytics: "វិភាគ",
+      analytics: "ការវិភាគ",
       menu: "ម៉ឺនុយ",
-      qrCode: "QR",
+      qrCode: "កូដ QR",
     },
 
     ownerLayout: {
-      toggleSidebar: "ប្ដូរ",
+      toggleSidebar: "បិទ ឬ បើករបារចំហៀង",
     },
 
     orders: {
       title: "ការបញ្ជាទិញ",
-      autoRefresh: "អាប់ដេត",
-      updatedAt: "បានអាប់ដេត",
+      autoRefresh: "ធ្វើបច្ចុប្បន្នភាពដោយស្វ័យប្រវត្តិរៀងរាល់ 30 វិនាទី",
+      updatedAt: "បានធ្វើបច្ចុប្បន្នភាព",
       refresh: "ផ្ទុកឡើងវិញ",
-      loadingOrders: "កំពុងផ្ទុក...",
-      emptyActive: "គ្មាន",
-      emptyAll: "គ្មាន",
+      loadingOrders: "កំពុងផ្ទុកការបញ្ជាទិញ...",
+      emptyActive: "មិនមានការបញ្ជាទិញកំពុងដំណើរការទេ។",
+      emptyAll: "មិនមានការបញ្ជាទិញទេ។",
       unknownItem: "មិនស្គាល់",
-      updating: "កំពុងអាប់ដេត...",
-      failedToLoadProfile: "បរាជ័យ",
-      errorLoadingOrders: "មានបញ្ហា",
-      failedToUpdateStatus: "បរាជ័យ",
-      pendingAlert: (c: number) => `${c} ការបញ្ជាទិញថ្មី`,
+      updating: "កំពុងធ្វើបច្ចុប្បន្នភាព...",
+      failedToLoadProfile: "បរាជ័យក្នុងការផ្ទុកប្រវត្តិរូប",
+      errorLoadingOrders: "មានបញ្ហាក្នុងការផ្ទុកការបញ្ជាទិញ",
+      failedToUpdateStatus: "បរាជ័យក្នុងការធ្វើបច្ចុប្បន្នភាពស្ថានភាព",
+      pendingAlert: (c: number) => `មានការបញ្ជាទិញថ្មី ${c}`,
       filters: {
         active: "កំពុងដំណើរការ",
         completed: "បានបញ្ចប់",
         all: "ទាំងអស់",
       },
       kpi: {
-        newOrders: "ថ្មី",
-        preparing: "រៀបចំ",
-        collected: "ទទួល",
-        totalToday: "សរុប",
+        newOrders: "ការបញ្ជាទិញថ្មី",
+        preparing: "កំពុងរៀបចំ",
+        collected: "បានទទួល",
+        totalToday: "សរុបថ្ងៃនេះ",
       },
       status: {
         pending: "ថ្មី",
-        preparing: "រៀបចំ",
-        completed: "រួច",
+        preparing: "កំពុងរៀបចំ",
+        completed: "រួចរាល់",
       },
       actions: {
         startPreparing: "ចាប់ផ្តើម",
         markCompleted: "បញ្ចប់",
-        completedPaid: "រួច",
+        completedPaid: "រួចរាល់",
       },
     },
 
     analytics: {
-      loading: "កំពុងផ្ទុក...",
-      failedToLoadProfile: "បរាជ័យ",
-      failedToLoadAnalytics: "បរាជ័យ",
+      loading: "កំពុងផ្ទុកទិន្នន័យវិភាគ...",
+      failedToLoadProfile: "បរាជ័យក្នុងការផ្ទុកប្រវត្តិរូប",
+      failedToLoadAnalytics: "បរាជ័យក្នុងការផ្ទុកទិន្នន័យវិភាគ",
       unknownItem: "មិនស្គាល់",
-      kpi: {
-        totalOrders: "សរុប",
-        totalRevenue: "ចំណូល",
-        todayOrders: "ថ្ងៃនេះ",
-        todayRevenue: "ថ្ងៃនេះ",
-        allTime: "ទាំងអស់",
-        sinceMidnight: "ថ្ងៃនេះ",
+      period: {
+        today: "ថ្ងៃនេះ",
+        week: "៧ ថ្ងៃ",
+        month: "៣០ ថ្ងៃ",
+      },
+      cards: {
+        totalOrders: "ការបញ្ជាទិញសរុប",
+        totalRevenue: "ចំណូលសរុប",
+        avgOrderValue: "តម្លៃមធ្យមក្នុងមួយការបញ្ជាទិញ",
+        peakHour: "ម៉ោងដែលមមាញឹកបំផុត",
+      },
+      sub: {
+        selectedPeriod: "ក្នុងរយៈពេលដែលបានជ្រើស",
+        completedOrdersOnly: "គិតតែការបញ្ជាទិញដែលបានបញ្ចប់",
+        noData: "មិនមានទិន្នន័យ",
+        noOrdersInPeriod: "មិនមានការបញ្ជាទិញក្នុងរយៈពេលនេះទេ",
+        noOrdersYet: "មិនទាន់មានការបញ្ជាទិញទេ",
+        totalOrders: "ការបញ្ជាទិញសរុប",
+        darkerMoreOrders: "ពណ៌កាន់តែងងឹតមានន័យថាការបញ្ជាទិញកាន់តែច្រើន",
       },
       sections: {
-        popularDrink: "ពេញនិយម",
-        recentOrders: "ថ្មីៗ",
+        dailyRevenue: "ចំណូលប្រចាំថ្ងៃ",
+        orderCompletion: "អត្រាបញ្ចប់ការបញ្ជាទិញ",
+        popularDrink: "ភេសជ្ជៈពេញនិយម",
+        recentOrders: "ការបញ្ជាទិញថ្មីៗ",
+        busiestHours: "ម៉ោងដែលមមាញឹកបំផុត",
+      },
+      completion: {
+        completed: "បានបញ្ចប់",
+      },
+      time: {
+        am: "ព្រឹក",
+        pm: "ល្ងាច",
+      },
+      units: {
+        orders: "ការបញ្ជាទិញ",
       },
       empty: {
-        noOrderData: "គ្មាន",
-        noOrders: "គ្មាន",
+        noOrderData: "មិនទាន់មានទិន្នន័យ",
+        noOrders: "មិនទាន់មានការបញ្ជាទិញ",
       },
     },
 
     menu: {
-      title: "ម៉ឺនុយ",
-      subtitle: "គ្រប់គ្រង",
+      title: "គ្រប់គ្រងម៉ឺនុយ",
+      subtitle: "គ្រប់គ្រងម៉ឺនុយ",
       addNewItem: "បន្ថែម",
       loadingMenu: "កំពុងផ្ទុក...",
-      emptyState: "គ្មាន",
+      emptyState: "គ្មានមុខម្ហូប",
       unavailable: "មិនមាន",
-      noDescription: "គ្មាន",
-      generateQr: "QR",
+      noDescription: "គ្មានការពិពណ៌នា",
+      generateQr: "បង្កើត QR",
       failedToLoadProfile: "បរាជ័យ",
-      errorLoadingMenu: "បញ្ហា",
+      errorLoadingMenu: "មានបញ្ហា",
       failedToUpdateAvailability: "បរាជ័យ",
       failedToDeleteItem: "បរាជ័យ",
       failedToUpdateItem: "បរាជ័យ",
-      confirmDelete: "លុប?",
+      confirmDelete: "លុបមែនទេ?",
+      searchPlaceholder: "ស្វែងរកភេសជ្ជៈ...",
+      noSearchResults: "រកមិនឃើញភេសជ្ជៈទេ។",
+      categories: {
+        hotDrinks: "ភេសជ្ជៈក្តៅ",
+        coldDrinks: "ភេសជ្ជៈត្រជាក់",
+        frappe: "ភេសជ្ជៈក្រឡុក",
+        otherDrinks: "ភេសជ្ជៈផ្សេងៗ",
+        hot: "ក្តៅ",
+        cold: "ត្រជាក់",
+      },
       actions: {
         edit: "កែ",
         delete: "លុប",
@@ -489,6 +600,9 @@ export const messages: Record<Locale, Messages> = {
       },
       modal: {
         editTitle: "កែ",
+        itemImage: "រូបភាព",
+        imagePreviewAlt: "មើលរូបភាព",
+        category: "ប្រភេទ",
         name: "ឈ្មោះ",
         namePlaceholder: "ឈ្មោះ",
         description: "ពិពណ៌នា",
@@ -546,12 +660,12 @@ export const messages: Record<Locale, Messages> = {
 
     menuAdd: {
       title: "បន្ថែមមុខម្ហូប",
-      subtitle: "បំពេញព័ត៌មាន",
+      subtitle: "បំពេញ",
       back: "ត្រឡប់",
-      image: "រូបភាពមុខម្ហូប",
-      imagePreviewAlt: "មើលរូបភាពមុខម្ហូបដែលបានជ្រើស",
+      image: "រូបភាព",
+      imagePreviewAlt: "មើលរូបភាព",
       name: "ឈ្មោះ",
-      namePlaceholder: "ឧ. Latte",
+      namePlaceholder: "ឧ. កាហ្វេទឹកដោះគោ",
       description: "ពិពណ៌នា",
       descriptionPlaceholder: "ស្រេចចិត្ត",
       price: "តម្លៃ",
