@@ -20,6 +20,7 @@ export default function QRMenuPage() {
   const [sugarLevel, setSugarLevel] = useState("100%");
   const [quantity, setQuantity] = useState(1);
   const [cart, setCart] = useState<CartItem[]>([]);
+  const [searchQuery, setSearchQuery] = useState("");
 
   useEffect(() => {
     if (!cafeId) return;
@@ -56,7 +57,7 @@ export default function QRMenuPage() {
       }
     };
 
-    fetchData();
+    void fetchData();
     return () => { cancelled = true; };
   }, [cafeId]);
 
@@ -81,6 +82,10 @@ export default function QRMenuPage() {
     router.push(`/qr/cafes/${cafeId}/payment`);
   };
 
+  const filteredMenu = menu.filter((item) =>
+    item.name.toLowerCase().includes(searchQuery.toLowerCase())
+  );
+
   const cartTotal = cart.reduce((sum, item) => sum + item.price * item.quantity, 0);
   const cartItemCount = cart.reduce((sum, item) => sum + item.quantity, 0);
 
@@ -96,7 +101,6 @@ export default function QRMenuPage() {
           color: #1A0F00;
         }
 
-        /* Header */
         .menu-page-header {
           background: #ffffff;
           border-bottom: 1px solid rgba(200,135,58,0.15);
@@ -135,7 +139,6 @@ export default function QRMenuPage() {
           font-weight: 300;
         }
 
-        /* Content */
         .menu-page-content {
           max-width: 960px;
           margin: 0 auto;
@@ -154,7 +157,80 @@ export default function QRMenuPage() {
           font-size: 13px;
           color: rgba(26,15,0,0.35);
           font-weight: 300;
+          margin-bottom: 20px;
+        }
+
+        /* Search bar */
+        .search-wrap {
+          position: relative;
           margin-bottom: 28px;
+        }
+
+        .search-input {
+          width: 100%;
+          padding: 12px 40px 12px 16px;
+          border: 1px solid rgba(200,135,58,0.2);
+          border-radius: 100px;
+          background: #ffffff;
+          color: #1A0F00;
+          font-size: 14px;
+          font-family: 'DM Sans', sans-serif;
+          outline: none;
+          transition: border-color 0.2s, box-shadow 0.2s;
+          box-shadow: 0 2px 8px rgba(0,0,0,0.04);
+        }
+
+        .search-input:focus {
+          border-color: rgba(200,135,58,0.5);
+          box-shadow: 0 2px 12px rgba(200,135,58,0.1);
+        }
+
+        .search-input::placeholder { color: rgba(26,15,0,0.28); }
+
+        .search-clear {
+          position: absolute;
+          right: 12px;
+          top: 50%;
+          transform: translateY(-50%);
+          background: rgba(26,15,0,0.08);
+          border: none;
+          border-radius: 50%;
+          width: 24px;
+          height: 24px;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          font-size: 14px;
+          color: rgba(26,15,0,0.4);
+          cursor: pointer;
+          transition: background 0.15s;
+          line-height: 1;
+        }
+
+        .search-clear:hover { background: rgba(26,15,0,0.14); }
+
+        .search-count {
+          font-size: 11px;
+          color: rgba(26,15,0,0.3);
+          margin-bottom: 16px;
+          margin-top: -16px;
+          padding-left: 4px;
+        }
+
+        .search-empty {
+          text-align: center;
+          padding: 48px 0;
+        }
+
+        .search-empty-icon {
+          font-size: 32px;
+          margin-bottom: 10px;
+        }
+
+        .search-empty-text {
+          font-size: 13px;
+          color: rgba(26,15,0,0.3);
+          line-height: 1.6;
         }
 
         .status-msg {
@@ -216,7 +292,6 @@ export default function QRMenuPage() {
           align-items: flex-end;
           justify-content: center;
           z-index: 50;
-          padding: 0;
           backdrop-filter: blur(4px);
         }
 
@@ -278,9 +353,7 @@ export default function QRMenuPage() {
           transition: border-color 0.2s;
         }
 
-        .modal-select:focus {
-          border-color: rgba(200,135,58,0.45);
-        }
+        .modal-select:focus { border-color: rgba(200,135,58,0.45); }
 
         /* Quantity picker */
         .qty-row {
@@ -302,7 +375,6 @@ export default function QRMenuPage() {
           background: #ffffff;
           color: #1A0F00;
           font-size: 18px;
-          font-weight: 400;
           cursor: pointer;
           display: flex;
           align-items: center;
@@ -318,11 +390,7 @@ export default function QRMenuPage() {
           transform: scale(1.06);
         }
 
-        .qty-btn:disabled {
-          opacity: 0.3;
-          cursor: not-allowed;
-          transform: none;
-        }
+        .qty-btn:disabled { opacity: 0.3; cursor: not-allowed; transform: none; }
 
         .qty-value {
           font-family: 'Cormorant Garamond', serif;
@@ -342,10 +410,7 @@ export default function QRMenuPage() {
           text-align: right;
         }
 
-        .modal-actions {
-          display: flex;
-          gap: 10px;
-        }
+        .modal-actions { display: flex; gap: 10px; }
 
         .modal-cancel {
           flex: 1;
@@ -360,9 +425,7 @@ export default function QRMenuPage() {
           transition: all 0.2s;
         }
 
-        .modal-cancel:hover {
-          background: rgba(26,15,0,0.04);
-        }
+        .modal-cancel:hover { background: rgba(26,15,0,0.04); }
 
         .modal-confirm {
           flex: 2;
@@ -384,7 +447,6 @@ export default function QRMenuPage() {
       `}</style>
 
       <div className="menu-page-root">
-        {/* Sticky header */}
         <header className="menu-page-header">
           <div className="header-logo">
             <span className="logo-dot" />
@@ -395,11 +457,11 @@ export default function QRMenuPage() {
 
         <div className="menu-page-content">
           <h1 className="menu-page-title">
-            {cafeName ? `${cafeName}` : "Café Menu"}
+            {cafeName ? cafeName : "Cafe Menu"}
           </h1>
           <p className="menu-page-sub">Browse our menu and add items to your order.</p>
 
-          {loading && <p className="status-msg">Loading menu…</p>}
+          {loading && <p className="status-msg">Loading menu...</p>}
           {error && <div className="error-msg">{error}</div>}
 
           {!loading && !error && menu.length === 0 && (
@@ -407,20 +469,55 @@ export default function QRMenuPage() {
           )}
 
           {!loading && !error && menu.length > 0 && (
-            <div className="menu-grid">
-              {menu.map((item) => (
-                <MenuCard
-                  key={item.id}
-                  item={item}
-                  isOrderEnabled
-                  onAddToCart={handleAddToCart}
+            <>
+              {/* Search bar */}
+              <div className="search-wrap">
+                <input
+                  className="search-input"
+                  type="text"
+                  placeholder="Search drinks..."
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
                 />
-              ))}
-            </div>
+                {searchQuery && (
+                  <button
+                    className="search-clear"
+                    onClick={() => setSearchQuery("")}
+                  >
+                    x
+                  </button>
+                )}
+              </div>
+
+              {searchQuery && (
+                <p className="search-count">
+                  {filteredMenu.length} {filteredMenu.length === 1 ? "drink" : "drinks"} found
+                </p>
+              )}
+
+              {filteredMenu.length === 0 ? (
+                <div className="search-empty">
+                  <p className="search-empty-icon">☕</p>
+                  <p className="search-empty-text">
+                    No drinks found for <strong>{searchQuery}</strong>
+                  </p>
+                </div>
+              ) : (
+                <div className="menu-grid">
+                  {filteredMenu.map((item) => (
+                    <MenuCard
+                      key={item.id}
+                      item={item}
+                      isOrderEnabled
+                      onAddToCart={handleAddToCart}
+                    />
+                  ))}
+                </div>
+              )}
+            </>
           )}
         </div>
 
-        {/* Cart button — now counts total quantity across all items */}
         {cart.length > 0 && (
           <button onClick={goToPayment} className="cart-btn">
             View Order · {cartItemCount} {cartItemCount === 1 ? "item" : "items"} · ${cartTotal.toFixed(2)}
@@ -442,11 +539,11 @@ export default function QRMenuPage() {
                 value={sugarLevel}
                 onChange={(e) => setSugarLevel(e.target.value)}
               >
-                <option value="0%">0% — No sugar</option>
-                <option value="25%">25% — Less sweet</option>
-                <option value="50%">50% — Half sweet</option>
-                <option value="75%">75% — Mostly sweet</option>
-                <option value="100%">100% — Full sweet</option>
+                <option value="0%">0% - No sugar</option>
+                <option value="25%">25% - Less sweet</option>
+                <option value="50%">50% - Half sweet</option>
+                <option value="75%">75% - Mostly sweet</option>
+                <option value="100%">100% - Full sweet</option>
               </select>
 
               <label className="modal-label">Quantity</label>
@@ -456,7 +553,7 @@ export default function QRMenuPage() {
                   disabled={quantity <= 1}
                   onClick={() => setQuantity((q) => Math.max(1, q - 1))}
                 >
-                  −
+                  -
                 </button>
                 <span className="qty-value">{quantity}</span>
                 <button
