@@ -659,7 +659,7 @@ export const messages: Record<Locale, Messages> = {
     },
 
     menuAdd: {
-      title: "បន្ថែមមុខម្ហូប",
+      title: "បន្ថែមភេសជ្ជៈ",
       subtitle: "បំពេញ",
       back: "ត្រឡប់",
       image: "រូបភាព",
