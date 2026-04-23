@@ -291,7 +291,9 @@ export default function OwnerMenuPage() {
             <div className="image-overlay" />
           </div>
         ) : (
-          <div className="item-image-fallback">No Image</div>
+          <div className={`item-image-fallback ${t.meta.isKhmer ? "khmer-text" : ""}`}>
+            {t.menu.modal.itemImage}
+          </div>
         )}
 
         {!item.is_available && (
@@ -901,7 +903,7 @@ export default function OwnerMenuPage() {
           <div>
             <input
               type="text"
-              placeholder="Search drinks..."
+              placeholder={t.menu.searchPlaceholder}
               className={`search-input ${t.meta.isKhmer ? "khmer-text" : ""}`}
               value={search}
               onChange={(e) => setSearch(e.target.value)}
@@ -936,7 +938,7 @@ export default function OwnerMenuPage() {
 
         {!loading && !error && menu.length > 0 && filteredMenu.length === 0 && (
           <p className={`status-msg ${t.meta.isKhmer ? "khmer-text" : ""}`}>
-            No drinks found.
+            {t.menu.noSearchResults}
           </p>
         )}
 
@@ -949,7 +951,7 @@ export default function OwnerMenuPage() {
                     t.meta.isKhmer ? "khmer-text" : ""
                   }`}
                 >
-                  Hot Drinks
+                  {t.menu.categories.hotDrinks}
                 </h2>
                 <div className="menu-grid">{renderMenuCards(hotItems)}</div>
               </section>
@@ -962,7 +964,7 @@ export default function OwnerMenuPage() {
                     t.meta.isKhmer ? "khmer-text" : ""
                   }`}
                 >
-                  Cold Drinks
+                  {t.menu.categories.coldDrinks}
                 </h2>
                 <div className="menu-grid">{renderMenuCards(coldItems)}</div>
               </section>
@@ -975,7 +977,7 @@ export default function OwnerMenuPage() {
                     t.meta.isKhmer ? "khmer-text" : ""
                   }`}
                 >
-                  Frappe
+                  {t.menu.categories.frappe}
                 </h2>
                 <div className="menu-grid">{renderMenuCards(frappeItems)}</div>
               </section>
@@ -988,7 +990,7 @@ export default function OwnerMenuPage() {
                     t.meta.isKhmer ? "khmer-text" : ""
                   }`}
                 >
-                  Other Drinks
+                  {t.menu.categories.otherDrinks}
                 </h2>
                 <div className="menu-grid">
                   {renderMenuCards(uncategorizedItems)}
@@ -1020,7 +1022,7 @@ export default function OwnerMenuPage() {
             <label
               className={`modal-label ${t.meta.isKhmer ? "khmer-text" : ""}`}
             >
-              Item Image
+              {t.menu.modal.itemImage}
             </label>
             <input
               type="file"
@@ -1045,7 +1047,7 @@ export default function OwnerMenuPage() {
                 {/* eslint-disable-next-line @next/next/no-img-element */}
                 <img
                   src={editPreview}
-                  alt="Edit item preview"
+                  alt={t.menu.modal.imagePreviewAlt}
                   className="modal-image-preview"
                 />
               </>
@@ -1088,7 +1090,7 @@ export default function OwnerMenuPage() {
             <label
               className={`modal-label ${t.meta.isKhmer ? "khmer-text" : ""}`}
             >
-              Category
+              {t.menu.modal.category}
             </label>
             <div className="category-grid">
               <button
@@ -1106,7 +1108,7 @@ export default function OwnerMenuPage() {
                   } as MenuItem)
                 }
               >
-                Hot
+                {t.menu.categories.hot}
               </button>
 
               <button
@@ -1124,7 +1126,7 @@ export default function OwnerMenuPage() {
                   } as MenuItem)
                 }
               >
-                Cold
+                {t.menu.categories.cold}
               </button>
 
               <button
@@ -1142,7 +1144,7 @@ export default function OwnerMenuPage() {
                   } as MenuItem)
                 }
               >
-                Frappe
+                {t.menu.categories.frappe}
               </button>
             </div>
 
