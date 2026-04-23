@@ -162,7 +162,7 @@ export default function AddMenuItemPage() {
 
         .page-title {
           font-family: 'Cormorant Garamond', serif;
-          font-size: 52px;
+          font-size: 25px;
           line-height: 0.95;
           font-weight: 600;
           margin-bottom: 8px;
