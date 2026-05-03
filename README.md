@@ -1,4 +1,4 @@
-<img width="1440" height="5104" alt="image" src="https://github.com/user-attachments/assets/adecb179-9c71-4180-87f9-ee79e2ffe3c9" /># CafeBoost ☕
+# CafeBoost ☕
 
 > Real-time QR ordering system built for solo roadside cafés — no app download required.
 
